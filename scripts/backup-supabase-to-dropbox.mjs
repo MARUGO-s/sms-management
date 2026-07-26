@@ -16,6 +16,9 @@ const tables = [
   "social_post_channels",
   "social_post_files",
   "social_integrations",
+  "social_admin_users",
+  "social_user_profiles",
+  "social_audit_logs",
 ];
 
 if (!supabaseUrl || !secretKey) {

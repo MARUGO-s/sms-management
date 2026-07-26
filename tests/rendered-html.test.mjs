@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { access } from "node:fs/promises";
 import test from "node:test";
 
-async function render() {
+async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
 
   return worker.fetch(
-    new Request("http://localhost/", {
+    new Request(`http://localhost${path}`, {
       headers: { accept: "text/html" },
     }),
     {
@@ -34,6 +34,15 @@ test("server-renders the Instatic TalksX operations console", async () => {
   assert.match(html, /Googleで続ける/);
   assert.match(html, /業務データはアカウントごとに保護されます/);
   assert.doesNotMatch(html, /Your site is taking shape|react-loading-skeleton/i);
+});
+
+test("server-renders the protected administrator route", async () => {
+  const response = await render("/admin");
+  assert.equal(response.status, 200);
+
+  const html = await response.text();
+  assert.match(html, /管理コンソール/);
+  assert.match(html, /管理者権限を確認しています/);
 });
 
 test("starter preview files are not part of the finished site", async () => {

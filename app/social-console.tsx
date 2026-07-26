@@ -2,6 +2,7 @@
 
 import { Button } from "@heroui/react";
 import type { User } from "@supabase/supabase-js";
+import Link from "next/link";
 import {
   AlertCircle,
   BarChart3,
@@ -245,6 +246,7 @@ export default function SocialConsole() {
     threads: false,
   });
   const [user, setUser] = useState<User | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
@@ -261,20 +263,31 @@ export default function SocialConsole() {
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    if (!supabase) {
-      setAuthLoading(false);
-      return;
-    }
+    if (!supabase) return;
 
     void supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
+      const sessionUser = data.session?.user ?? null;
+      setUser(sessionUser);
+      if (!sessionUser) {
+        setIsAdmin(false);
+        setWorkspaceId(null);
+        setHistory([]);
+        setIntegrations(createDefaultIntegrations());
+      }
       setAuthLoading(false);
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      const sessionUser = session?.user ?? null;
+      setUser(sessionUser);
+      if (!sessionUser) {
+        setIsAdmin(false);
+        setWorkspaceId(null);
+        setHistory([]);
+        setIntegrations(createDefaultIntegrations());
+      }
       setAuthLoading(false);
     });
 
@@ -282,14 +295,26 @@ export default function SocialConsole() {
   }, []);
 
   useEffect(() => {
-    if (!user) {
-      setWorkspaceId(null);
-      setHistory([]);
-      setIntegrations(createDefaultIntegrations());
-      return;
-    }
-    void loadWorkspaceData(user);
-  }, [user?.id]);
+    if (user) void loadWorkspaceData(user);
+  }, [user]);
+
+  useEffect(() => {
+    if (!supabase || !user) return;
+    let active = true;
+
+    void supabase
+      .from("social_admin_users")
+      .select("user_id")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active) setIsAdmin(Boolean(data));
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [user]);
 
   const selectedLabels = useMemo(
     () => selectedChannels.map((id) => channelById[id].label),
@@ -360,16 +385,41 @@ export default function SocialConsole() {
     setNotice(null);
 
     try {
-      const { data: existingWorkspace, error: workspaceError } = await supabase
+      const { data: ownedWorkspace, error: ownedWorkspaceError } = await supabase
         .from("social_workspaces")
         .select("id, name")
+        .eq("created_by", currentUser.id)
         .order("created_at", { ascending: true })
         .limit(1)
         .maybeSingle();
 
-      if (workspaceError) throw workspaceError;
+      if (ownedWorkspaceError) throw ownedWorkspaceError;
 
-      let activeWorkspace = existingWorkspace;
+      let activeWorkspace = ownedWorkspace;
+      if (!activeWorkspace) {
+        const { data: membership, error: membershipError } = await supabase
+          .from("social_workspace_members")
+          .select("workspace_id")
+          .eq("user_id", currentUser.id)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        if (membershipError) throw membershipError;
+
+        if (membership) {
+          const { data: memberWorkspace, error: memberWorkspaceError } =
+            await supabase
+              .from("social_workspaces")
+              .select("id, name")
+              .eq("id", membership.workspace_id)
+              .single();
+
+          if (memberWorkspaceError) throw memberWorkspaceError;
+          activeWorkspace = memberWorkspace;
+        }
+      }
+
       if (!activeWorkspace) {
         const { data: createdWorkspace, error: createError } = await supabase
           .from("social_workspaces")
@@ -1008,6 +1058,12 @@ export default function SocialConsole() {
               </button>
             );
           })}
+          {isAdmin && (
+            <Link className="view-tab admin-nav-link" href="/admin">
+              <ShieldCheck aria-hidden="true" size={18} />
+              <span>管理者</span>
+            </Link>
+          )}
         </nav>
 
         <section className="account-stack" aria-label="接続アカウント">
