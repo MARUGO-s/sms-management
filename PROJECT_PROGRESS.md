@@ -982,3 +982,13 @@ supabase functions deploy media-jobs --use-api
 - Dropbox: Gitソースミラーを更新し、`PROJECT_PROGRESS.md`をGit作業場所と一致させる。`.env*`と秘密JSONは同期しない。
 - 未完了事項: 9分16秒動画が15分以内に`変換済み`へ遷移するか未確認。遷移しない場合は既存Cloud Run Executionログ、Supabase job status、workerのエラーを調査する。SNS API連携・実投稿公開は未実装。
 - 次のAIへの最初の作業: `PROJECT_PROGRESS.md`と`AI_HANDOFF.md`を全文確認し、`git status`を確認。既存資源を再作成せず、まずアプリ履歴を更新して変換済みMP4を確認する。秘密値は表示・取得・再発行しない。
+
+### 2026-07-27 00:40 JST - GitHub Pagesのトップ表示を修正
+
+- 依頼: GitHub PagesのURLを開くとREADMEが表示されるため、トップページからアプリを開けるようにする。
+- 実施内容: リポジトリルートに`index.html`を追加。GitHub Pagesのトップアクセスを本番アプリURLへ即時リダイレクトし、自動遷移できない場合のリンクも表示する。
+- 変更ファイル: `index.html`、`PROJECT_PROGRESS.md`、`AI_HANDOFF.md`。
+- DB・設定変更: なし。GitHub Pagesはアプリ実行環境ではなく、本番アプリはOpenAI Sites上で動作するため、Pages側は本番URLへの入口として扱う。
+- 検証: `git diff --check`とHTML内容を確認。GitHub Pagesの反映後、`https://marugo-s.github.io/sms-management/`を開き、本番URLへ遷移することを確認する。GitHub Pagesの反映には数分かかる場合がある。
+- 未完了事項: GitHub Pagesのリモート反映後のブラウザ確認は未完了。ブラウザキャッシュが残る場合はプライベートウィンドウまたは強制再読み込みを使う。
+- 次の作業: GitHub Pages URLを再読込し、本番アプリへ遷移することを確認。アプリの機能変更は本番Sites側のデプロイで行い、GitHub Pages用の`index.html`をアプリ本体と混同しない。
