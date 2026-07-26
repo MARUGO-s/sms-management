@@ -8,7 +8,7 @@ Generated from `knowledge/system-architecture.json` and the current Graphify gra
 - Repository: MARUGO-s/sms-management
 - Production: https://marugo-s.github.io/sms-management/
 - Graphify: 326 nodes / 343 relationships / 32 communities
-- Generated: 2026-07-26T19:47:23.131Z
+- Generated: 2026-07-26T19:48:58.832Z
 
 ## Required workflow
 1. Read `PROJECT_PROGRESS.md`, `AI_HANDOFF.md`, `docs/AI_KNOWLEDGE_SYSTEM.md`, and Obsidian `70_AI作業環境/00_AI_START_HERE.md`.
