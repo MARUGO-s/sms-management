@@ -3,7 +3,7 @@
 ## 文書情報
 
 - 記録日時: 2026-07-26 21:50:36 JST
-- 最終更新日時: 2026-07-26 23:20 JST
+- 最終更新日時: 2026-07-26 23:26 JST
 - 対象リポジトリ: `https://github.com/MARUGO-s/sms-management.git`
 - 対象ブランチ: `main`
 - 今回の作業開始時HEAD: `776feed5ca0b22e0d34d8ad307884faf87b2b124`
@@ -139,9 +139,9 @@ Instatic TalksXは、Instagram、TikTok、X、Threadsの運用情報を一括管
 - Sites project ID: `appgprj_6a65e85b2c6c8191b197204738f2e23f`
 - `.openai/hosting.json`にproject IDを保存
 - アクセスモード: 所有者のみのカスタムアクセス
-- 最新Sitesバージョン: v8
-- v8のsource commit: `ed6ecf98e37ebd3d5096f3c71f6f1716a02bde54`
-- v8は本番公開済み
+- 最新Sitesバージョン: v9
+- v9のsource commit: `1a1a79b2f7477b57bb877362adc6228eac88e26f`
+- v9は所有者限定アクセスのまま本番公開済み
 
 ## 通常画面の機能
 
@@ -942,8 +942,8 @@ supabase functions deploy media-jobs --use-api
 - RLS検証: `anon`にテーブル権限がないこと、RLS有効、認証済み利用者の正しい動画ジョブ作成成功、元動画とジョブの投稿・ワークスペース一致条件を確認。検証データはTransactionとRollbackを使用し、本番残存0件を確認。
 - テスト: `npm test` 7件成功、`npm run build`成功、`supabase db lint`エラー0、Edge Function未認証POSTは401、Supabase Advisorsは既知のPro限定Auth警告1件のみ。
 - セキュリティ: service role、Google service-account JSON、SNSシークレットはGitへ追加していない。Cloud Run側はGoogle Secret Manager、Dispatcher側はSupabase Secretsへ保存する手順。
-- デプロイ: Supabase DBと`media-jobs` Edge Functionは本番反映済み。Sitesはこの記録時点では公開処理中。
-- Git: この記録を含む実装を`main`へcommit・pushする。
-- Dropbox: Git push後に`.env*`を除外してソースミラーへ同期する。
+- デプロイ: Supabase DBと`media-jobs` Edge Functionを本番反映。Sites v9を所有者限定アクセスのまま`https://instatic-talksx.yoshito0428.chatgpt.site`へ本番公開。Sites source commitは`1a1a79b2f7477b57bb877362adc6228eac88e26f`。
+- Git: 実装commit `1a1a79b2f7477b57bb877362adc6228eac88e26f`を`main`へpush。公開結果を記録する文書commitも同じ`main`へpushする。
+- Dropbox: `.env*`を除外してソースミラーへ同期し、`PROJECT_PROGRESS.md`の一致と秘密ファイル除外を確認する。
 - 未完了事項: Cloud Run Job自体はGCPプロジェクト未選定、`gcloud`未導入、Docker未起動、server-only key未配置のため未デプロイ。接続前のジョブは`queued`で保持される。
 - 次の作業: 使用するGCPプロジェクトを所有者が指定後、`workers/media-processor/README.md`に従ってCloud Runを接続し、50MB未満の実動画1件で処理完了を確認する。
