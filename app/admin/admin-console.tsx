@@ -10,9 +10,11 @@ import {
   CalendarDays,
   CheckCircle2,
   Download,
+  ExternalLink,
   FileText,
   FolderOpen,
   Loader2,
+  Network,
   RefreshCcw,
   Search,
   ShieldAlert,
@@ -24,7 +26,13 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 
-type AdminView = "posts" | "schedule" | "files" | "activity" | "users";
+type AdminView =
+  | "posts"
+  | "schedule"
+  | "files"
+  | "activity"
+  | "users"
+  | "system";
 type AccessState = "checking" | "granted" | "denied";
 type PostStatus = "draft" | "scheduled" | "published" | "failed";
 
@@ -107,6 +115,7 @@ const adminViews = [
   { id: "files" as const, label: "ファイル", icon: FolderOpen },
   { id: "activity" as const, label: "操作履歴", icon: Activity },
   { id: "users" as const, label: "利用者", icon: Users },
+  { id: "system" as const, label: "システムマップ", icon: Network },
 ];
 
 const statusOptions: Array<{ value: PostStatus; label: string }> = [
@@ -828,51 +837,55 @@ export default function AdminConsole() {
           </div>
         )}
 
-        <div className="admin-toolbar">
-          <label className="admin-search">
-            <Search aria-hidden="true" size={17} />
-            <span className="sr-only">管理データを検索</span>
-            <input
-              placeholder="利用者、投稿、ファイルを検索"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-            />
-          </label>
-          <div className="admin-toolbar-filters">
-            <label className="admin-filter">
-              <span>店舗</span>
-              <select
-                value={storeFilter}
-                onChange={(event) => setStoreFilter(event.target.value)}
-              >
-                <option value="all">全店舗</option>
-                {stores.map((store) => (
-                  <option key={store.id} value={store.id}>
-                    {store.name}
-                  </option>
-                ))}
-              </select>
+        {activeView !== "system" && (
+          <div className="admin-toolbar">
+            <label className="admin-search">
+              <Search aria-hidden="true" size={17} />
+              <span className="sr-only">管理データを検索</span>
+              <input
+                placeholder="利用者、投稿、ファイルを検索"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+              />
             </label>
-            {activeView === "posts" && (
+            <div className="admin-toolbar-filters">
               <label className="admin-filter">
-                <span>ステータス</span>
+                <span>店舗</span>
                 <select
-                  value={statusFilter}
-                  onChange={(event) =>
-                    setStatusFilter(event.target.value as "all" | PostStatus)
-                  }
+                  value={storeFilter}
+                  onChange={(event) => setStoreFilter(event.target.value)}
                 >
-                  <option value="all">すべて</option>
-                  {statusOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
+                  <option value="all">全店舗</option>
+                  {stores.map((store) => (
+                    <option key={store.id} value={store.id}>
+                      {store.name}
                     </option>
                   ))}
                 </select>
               </label>
-            )}
+              {activeView === "posts" && (
+                <label className="admin-filter">
+                  <span>ステータス</span>
+                  <select
+                    value={statusFilter}
+                    onChange={(event) =>
+                      setStatusFilter(
+                        event.target.value as "all" | PostStatus,
+                      )
+                    }
+                  >
+                    <option value="all">すべて</option>
+                    {statusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {(activeView === "posts" || activeView === "schedule") && (
           <section
@@ -1189,6 +1202,36 @@ export default function AdminConsole() {
                 <span>条件に一致する操作履歴はありません。</span>
               </div>
             )}
+          </section>
+        )}
+
+        {activeView === "system" && (
+          <section className="admin-system-map" aria-label="システムマップ">
+            <div className="admin-system-map-heading">
+              <div>
+                <p className="eyebrow">Graphify</p>
+                <h3>システムマップ</h3>
+              </div>
+              <a
+                className="admin-system-map-link"
+                href="/system-map/graph.html"
+                rel="noreferrer"
+                target="_blank"
+              >
+                <ExternalLink aria-hidden="true" size={16} />
+                <span>別画面で開く</span>
+              </a>
+            </div>
+            <div className="admin-system-map-stats" aria-label="グラフ情報">
+              <span>254 ノード</span>
+              <span>269 関係</span>
+              <span>コードのみ</span>
+            </div>
+            <iframe
+              className="admin-system-map-frame"
+              src="/system-map/graph.html"
+              title="Instatic TalksX システムマップ"
+            />
           </section>
         )}
 

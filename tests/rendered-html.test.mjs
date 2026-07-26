@@ -52,7 +52,8 @@ test("starter preview files are not part of the finished site", async () => {
 });
 
 test("store affiliation and administrator schedules remain wired into the app", async () => {
-  const [consoleSource, adminSource, migrationSource] = await Promise.all([
+  const [consoleSource, adminSource, migrationSource, graphAsset] =
+    await Promise.all([
     readFile(new URL("../app/social-console.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/admin/admin-console.tsx", import.meta.url), "utf8"),
     readFile(
@@ -62,6 +63,7 @@ test("store affiliation and administrator schedules remain wired into the app", 
       ),
       "utf8",
     ),
+    readFile(new URL("../public/system-map/graph.html", import.meta.url), "utf8"),
   ]);
 
   assert.match(consoleSource, /所属店舗/);
@@ -69,8 +71,11 @@ test("store affiliation and administrator schedules remain wired into the app", 
   assert.match(adminSource, /予約予定/);
   assert.match(adminSource, /店舗別運用状況/);
   assert.match(adminSource, /全店舗/);
+  assert.match(adminSource, /システムマップ/);
+  assert.match(adminSource, /\/system-map\/graph\.html/);
   assert.match(migrationSource, /create table public\.social_stores/);
   assert.match(migrationSource, /'BLU NERO'/);
+  assert.match(graphAsset, /vis-network/);
 });
 
 test("video crop jobs keep originals and use the protected worker flow", async () => {

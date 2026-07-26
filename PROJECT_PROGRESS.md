@@ -1003,3 +1003,14 @@ supabase functions deploy media-jobs --use-api
 - デプロイ: Sites本番バージョン10として公開完了（2026-07-27 01:03 JST）。本番URLは`https://instatic-talksx.yoshito0428.chatgpt.site`。Supabase DB・Edge Function変更なし。
 - 未完了事項: 認証済みブラウザ上で予約投稿を1件キャンセルし、予約一覧からの消失と履歴での下書き表示を実操作確認すること。未認証のHTTP確認は所有者限定公開のため`401`となる。
 - 次の作業: 認証済み本番画面で予約投稿を1件選び、確認ダイアログ、予約一覧からの消失、履歴での下書き表示を確認する。既存の動画Cloud Run資源や秘密値は触らない。
+
+### 2026-07-27 01:25 JST - Graphify管理者用システムマップを追加
+
+- 依頼: インストール済みのGraphifyをSNS管理アプリへ最適化して対応する。
+- 実施内容: `/admin`に管理者専用の`システムマップ`タブを追加。Graphifyのコード構成グラフをアプリ内で表示し、別画面でも確認できるようにした。更新用に`npm run graphify:system-map`と`scripts/refresh-system-map.sh`を追加。
+- 解析範囲: `graphify extract . --code-only --out .`でアプリのコード構成のみを対象にした。投稿本文、添付ファイル、Supabaseの本番データ、環境変数、SNS連携情報、秘密キーは解析・表示・送信しない。`graphify-out/`はローカル作業用としてGitとDropboxソースミラーから除外する。
+- 生成結果: 254ノード、269関係、25コミュニティ。Graph診断でmissing edge、dangling edge、self-loop、collapsed edgeは0件。
+- 変更ファイル: `app/admin/admin-console.tsx`、`app/globals.css`、`public/system-map/graph.html`、`public/system-map/GRAPH_REPORT.md`、`scripts/refresh-system-map.sh`、`package.json`、`.gitignore`、`README.md`、`AI_HANDOFF.md`、テスト。
+- DB・設定変更: Supabase migration、Edge Function、Cloud Run、Google Cloud、SNS APIの変更なし。Graphify CLIはCodex開発環境にのみインストール済みで、アプリ利用者端末に依存関係を追加していない。
+- 検証・デプロイ: `npm test`、実際の管理画面表示、Git差分・秘密情報確認、Sites本番公開をこの後に実施して結果を追記する。
+- 次の作業: コード構成を大きく変更した時だけ`npm run graphify:system-map`を実行し、生成された公開用マップをレビューしてから本番へデプロイする。Graphifyを実データ処理に使う場合は、別途Supabase RLS・Storage・Cloud Runを含む設計を行う。

@@ -18,6 +18,7 @@ Instagram、TikTok、X、Threadsの投稿予約、履歴、添付ファイル、
 - 管理者画面での全店舗一覧と店舗別の絞り込み・運用状況確認
 - 管理者による投稿ステータス更新と期限付きファイル取得
 - 利用者一覧からの管理者権限付与・解除（最後の管理者は解除不可）
+- 管理者専用のGraphifyシステムマップによるコード構成の確認
 - 投稿本文やAPIシークレットを複製しない監査ログ
 - SupabaseからDropboxへの管理者向けバックアップ
 
@@ -41,6 +42,18 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key
 ```
 
 秘密キー、service role key、SNSトークンをGitへ保存しないでください。
+
+## System map
+
+`/admin` の「システムマップ」は、Graphifyで生成したアプリのコード構成図です。利用者の投稿本文、添付ファイル、Supabaseデータ、環境変数、SNS連携シークレットは解析・表示しません。
+
+アプリ構成を変更した後だけ、Graphify CLIが入った開発環境で更新します。
+
+```bash
+npm run graphify:system-map
+```
+
+このコマンドはローカルの`graphify-out/`に作業用出力を生成し、公開用の`public/system-map/graph.html`だけを更新します。`graphify-out/`はGit・Dropboxソースミラーに保存しません。
 
 ## Supabase
 

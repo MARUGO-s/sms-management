@@ -129,3 +129,9 @@ The reservation view now has a `キャンセル` button for each scheduled post.
 ## GitHub Pages entrypoint
 
 GitHub Pages previously showed the repository README because the repository is not a static export of the Vinext application. The actual application remains deployed at `https://instatic-talksx.yoshito0428.chatgpt.site`. A root `index.html` was added to redirect GitHub Pages visitors to that production URL. After the commit is pushed, verify `https://marugo-s.github.io/sms-management/` after the Pages deployment finishes. Do not move Supabase keys or the server application into GitHub Pages; the redirect file contains no secrets.
+
+## Graphify system map
+
+The administrator console includes a `システムマップ` view backed by the static asset `public/system-map/graph.html`. It is a Graphify code-only architecture map, not a graph of production SNS posts, files, users, Supabase rows, or secrets. The current graph was generated with `graphify extract . --code-only --out .` and has 254 nodes, 269 relationships, and 25 communities. Its diagnostics reported no missing or dangling edges.
+
+To refresh it after intentional code structure changes, run `npm run graphify:system-map` on a development machine where the Graphify CLI is installed. The script regenerates `graphify-out/` locally, then copies the reviewed `graph.html` and `GRAPH_REPORT.md` into `public/system-map/`. `graphify-out/` is deliberately ignored by Git and must not be added to the Dropbox source mirror. Keep this code-only boundary; do not add environment files, runtime secrets, user uploads, post content, or database exports to Graphify input without an explicit security design review.
