@@ -3,7 +3,7 @@
 ## 文書情報
 
 - 記録日時: 2026-07-26 21:50:36 JST
-- 最終更新日時: 2026-07-26 03:26 JST
+- 最終更新日時: 2026-07-26 03:39 JST
 - 対象リポジトリ: `https://github.com/MARUGO-s/sms-management.git`
 - 対象ブランチ: `main`
 - 作業開始時HEAD: `254ae115195425d8672983eb765240713aaebf4f`
@@ -33,6 +33,24 @@
 3. UI変更は確認したURLとデスクトップ・モバイルの確認結果を残す。
 4. 問題や未完了事項を隠さず、再現条件と次の具体的な手順を残す。
 5. 以前の記録は原則として削除しない。誤りを訂正する場合は、訂正日時と理由を追記する。
+
+### コード調査の必須手順（絶対事項）
+
+このプロジェクトにはGraphify（コード構成のナレッジグラフ）が導入済みである。コードを調べるときは、次を絶対事項として守る。
+
+1. まずGraphifyでコードの場所と関係を特定してから読む。当てずっぽうの広範囲`grep`／`read`の連打を最初の手段にしない。
+2. 使うコマンドは作業ディレクトリ`/Users/yoshito/Documents/New project`で実行する。
+   - `graphify query "<自然言語の質問>"` … 関連ノードを横断で特定
+   - `graphify path "<A>" "<B>"` … 2ノード間の経路
+   - `graphify explain "<関数名など>"` … そのノードの呼び出し元・呼び出し先
+3. Graphifyで当たりを付けた後は、該当ファイルの必要な箇所だけをピンポイントで読む。全体を無差別に`grep`しない。
+4. Graphifyの限界を理解して補完する。次はコード限定の静的グラフに載らないため、該当ファイルを直接確認する。
+   - SQL migration / RLS / trigger（例: 管理者権限は`supabase/migrations/`のSQLに実装があり、queryでは出ない）
+   - DB・HTTP・Cloud Runをまたぐ実行時フロー（UIからワーカーまでが1本の`path`として繋がらない）
+   - CSS・`Dockerfile`・`config.toml`など分類対象外ファイル
+5. コード構成を変更したら、必ず`npm run graphify:system-map`でグラフと`public/system-map/`を最新化してからレビュー・デプロイする。古いグラフのまま調査・報告しない。
+6. `graphify update .`（watch版）はサンドボックス環境で`Operation not permitted`になることがある。その場合は`npm run graphify:system-map`（内部で`graphify extract . --code-only`＋`graphify cluster-only .`）で更新する。
+7. Graphifyの解析対象はコード構成に限定する。投稿本文、添付ファイル、Supabase本番データ、環境変数、SNS連携シークレットをGraphifyの入力にしない。
 
 ### 作業終了時
 
@@ -1048,3 +1066,14 @@ supabase functions deploy media-jobs --use-api
 - デプロイ: commit `981c7ac04a45e08598eb4dc8a3ab3e9aaecb3177`を`main`へpush。GitHub Actions `Deploy Instatic TalksX to GitHub Pages`（run `30214762150`）は成功。公開中の`/system-map/GRAPH_REPORT.md`と`graph.html`はいずれもHTTP 200で、264ノード、282関係の最新版を確認した。OpenAI Sitesはこの作業では変更していない。
 - Dropbox: commit後にGit管理ツリーを`/Users/yoshito/Library/CloudStorage/Dropbox/web/instatic-talksx/`へ同期し、`.env.local`と`.git`を含めない。
 - 次の作業: GitHub ActionsのPagesデプロイ成功後、`/sms-management/admin/`でシステムマップが264ノード、282関係の最新版として開くことを確認する。管理者権限フローをGraphifyで横断探索したい場合は、SQL migrationを安全に含める抽出設計を別途追加する。
+
+### 2026-07-26 03:39 JST - Graphify優先のコード調査を絶対事項として明文化
+
+- 依頼: Graphifyがあるので、当てずっぽうの`grep`／`read`の連打を繰り返さない運用を、MDファイルへ絶対事項として記載する。
+- 実施内容: `PROJECT_PROGRESS.md`の「AI引き継ぎの必須ルール」に「### コード調査の必須手順（絶対事項）」を追加し、`AI_HANDOFF.md`に「## Mandatory Graphify-first code investigation」を追加した。Graphifyで場所と関係を特定してから必要箇所だけを読むこと、SQL/RLS・実行時フロー・分類対象外ファイルは直接確認すること、コード変更後は`npm run graphify:system-map`で更新すること、Graphifyの入力をコード限定に保つことを明記。
+- 変更ファイル: `PROJECT_PROGRESS.md`、`AI_HANDOFF.md`。
+- DB・設定変更: なし。アプリコードの変更なし（ドキュメントのみ）。
+- テスト: ドキュメント変更のため`npm test`は再実行せず。`git diff --check`で確認する。
+- デプロイ: 本commitを`main`へpushし、GitHub Actionsが実行される（アプリ挙動への影響はドキュメントのみのため無し）。OpenAI Sitesは変更しない。
+- Dropbox: commit後にGit管理ツリーをソースミラーへ同期し、`.env.local`と`.git`を含めない。
+- 次の作業: 次回以降のコード調査は、まずGraphify（query/path/explain）で当たりを付けてから該当箇所だけを読む運用を守る。

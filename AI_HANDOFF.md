@@ -149,6 +149,20 @@ To refresh it after intentional code structure changes, run `npm run graphify:sy
 
 This integration was deployed as Sites v11 from source commit `827d5ddf03a7e6e4699dfd69cf949b813df012d0`. The Graphify static asset is suitable for architecture review only; it does not replace the existing Supabase RLS, Cloud Run processing, or admin authorization paths.
 
+## Mandatory Graphify-first code investigation
+
+This is an absolute operating rule for every AI and developer working on this repository.
+
+- Before broad `grep` or repeated file reads, use the existing Graphify graph to identify the relevant nodes, files, and relationships.
+- Run Graphify from `/Users/yoshito/Documents/New project`.
+- Use `graphify query "<question>"` for cross-code discovery, `graphify path "<A>" "<B>"` for a connection trace, and `graphify explain "<node>"` for callers and callees.
+- After Graphify identifies the likely implementation, read only the required source ranges. Do not begin with blind repository-wide `grep`/`read` loops.
+- Graphify is a structural map, not a substitute for source verification. Read the relevant files directly when editing code or checking exact behavior.
+- SQL migrations, RLS policies, triggers, CSS, Docker/config files, and runtime links across Supabase, HTTP, Edge Functions, and Cloud Run may not appear as connected Graphify nodes. Inspect those specific files directly when they are part of the task.
+- After intentional code-structure changes, run `npm run graphify:system-map` before review and deployment. Do not investigate or report from a stale graph.
+- If `graphify update .` fails with a sandbox watcher permission error, use `npm run graphify:system-map`, which performs the safe code-only extract and clustering flow.
+- Keep Graphify code-only. Never add environment files, secrets, user posts, uploaded files, production database exports, or SNS credentials to its input.
+
 ## Production site access
 
 The production Sites project is now configured as `public` and was re-published as Sites v12 from source commit `93f90337cfafe1b48228117b426815ab9a70a3f4`. This removed the ChatGPT sign-in gate that appeared after the GitHub Pages redirect. An unauthenticated request to `https://instatic-talksx.yoshito0428.chatgpt.site` now returns the Instatic TalksX application (`HTTP 200`), whose data access remains protected by Supabase Auth and RLS. Do not re-enable owner-only Sites access unless the owner explicitly asks for a ChatGPT-gated internal preview.
