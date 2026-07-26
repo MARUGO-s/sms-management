@@ -15,6 +15,8 @@ import {
   Search,
   ShieldAlert,
   ShieldCheck,
+  UserMinus,
+  UserPlus,
   Users,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -29,6 +31,11 @@ type UserProfileRow = {
   email: string;
   created_at: string;
   last_sign_in_at: string | null;
+};
+
+type AdminUserRow = {
+  user_id: string;
+  granted_at: string;
 };
 
 type WorkspaceRow = {
@@ -115,6 +122,7 @@ const entityLabels: Record<string, string> = {
   social_post_channels: "投稿先",
   social_post_files: "ファイル",
   social_integrations: "SNS連携",
+  social_admin_users: "管理者権限",
 };
 
 function formatDateTime(value: string | null) {
@@ -157,10 +165,15 @@ export default function AdminConsole() {
   const [activeView, setActiveView] = useState<AdminView>("posts");
   const [dataLoading, setDataLoading] = useState(false);
   const [updatingPostId, setUpdatingPostId] = useState<string | null>(null);
+  const [updatingAdminId, setUpdatingAdminId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | PostStatus>("all");
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
   const [profiles, setProfiles] = useState<UserProfileRow[]>([]);
+  const [adminUsers, setAdminUsers] = useState<AdminUserRow[]>([]);
   const [workspaces, setWorkspaces] = useState<WorkspaceRow[]>([]);
   const [memberships, setMemberships] = useState<MembershipRow[]>([]);
   const [posts, setPosts] = useState<PostRow[]>([]);
@@ -297,6 +310,7 @@ export default function AdminConsole() {
     try {
       const [
         profilesResult,
+        adminUsersResult,
         workspacesResult,
         membershipsResult,
         postsResult,
@@ -308,6 +322,11 @@ export default function AdminConsole() {
           .from("social_user_profiles")
           .select("user_id, email, created_at, last_sign_in_at")
           .order("created_at", { ascending: false })
+          .limit(1000),
+        supabase
+          .from("social_admin_users")
+          .select("user_id, granted_at")
+          .order("granted_at", { ascending: true })
           .limit(1000),
         supabase
           .from("social_workspaces")
@@ -347,6 +366,7 @@ export default function AdminConsole() {
 
       const failedResult = [
         profilesResult,
+        adminUsersResult,
         workspacesResult,
         membershipsResult,
         postsResult,
@@ -358,6 +378,7 @@ export default function AdminConsole() {
       if (failedResult?.error) throw failedResult.error;
 
       setProfiles((profilesResult.data ?? []) as UserProfileRow[]);
+      setAdminUsers((adminUsersResult.data ?? []) as AdminUserRow[]);
       setWorkspaces((workspacesResult.data ?? []) as WorkspaceRow[]);
       setMemberships((membershipsResult.data ?? []) as MembershipRow[]);
       setPosts((postsResult.data ?? []) as unknown as PostRow[]);
@@ -365,9 +386,10 @@ export default function AdminConsole() {
       setAuditLogs((auditResult.data ?? []) as unknown as AuditRow[]);
       setIntegrations((integrationsResult.data ?? []) as IntegrationRow[]);
     } catch (error) {
-      setNotice(
-        getErrorMessage(error, "管理データの読み込みに失敗しました。"),
-      );
+      setNotice({
+        tone: "error",
+        text: getErrorMessage(error, "管理データの読み込みに失敗しました。"),
+      });
     } finally {
       setDataLoading(false);
     }
@@ -409,7 +431,13 @@ export default function AdminConsole() {
       .eq("id", postId);
 
     if (error) {
-      setNotice(getErrorMessage(error, "投稿ステータスを更新できませんでした。"));
+      setNotice({
+        tone: "error",
+        text: getErrorMessage(
+          error,
+          "投稿ステータスを更新できませんでした。",
+        ),
+      });
     } else {
       setPosts((current) =>
         current.map((post) =>
@@ -433,13 +461,92 @@ export default function AdminConsole() {
       });
 
     if (error || !data?.signedUrl) {
-      setNotice(
-        getErrorMessage(error, "ファイルのダウンロードURLを作成できませんでした。"),
-      );
+      setNotice({
+        tone: "error",
+        text: getErrorMessage(
+          error,
+          "ファイルのダウンロードURLを作成できませんでした。",
+        ),
+      });
       return;
     }
 
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }
+
+  async function grantAdministratorAccess(profile: UserProfileRow) {
+    if (!supabase || !user) return;
+    setUpdatingAdminId(profile.user_id);
+    setNotice(null);
+
+    const { data, error } = await supabase
+      .from("social_admin_users")
+      .insert({
+        user_id: profile.user_id,
+        granted_by: user.id,
+      })
+      .select("user_id, granted_at")
+      .single();
+
+    if (error || !data) {
+      setNotice({
+        tone: "error",
+        text: getErrorMessage(error, "管理者権限を付与できませんでした。"),
+      });
+    } else {
+      setAdminUsers((current) => [
+        ...current,
+        data as AdminUserRow,
+      ]);
+      setNotice({
+        tone: "success",
+        text: `${profile.email}へ管理者権限を付与しました。`,
+      });
+    }
+
+    setUpdatingAdminId(null);
+  }
+
+  async function revokeAdministratorAccess(profile: UserProfileRow) {
+    if (!supabase || !user || profile.user_id === user.id) return;
+    if (
+      !window.confirm(
+        `${profile.email}の管理者権限を解除します。よろしいですか？`,
+      )
+    ) {
+      return;
+    }
+
+    setUpdatingAdminId(profile.user_id);
+    setNotice(null);
+
+    const { data, error } = await supabase
+      .from("social_admin_users")
+      .delete()
+      .eq("user_id", profile.user_id)
+      .select("user_id");
+
+    if (error || !data?.length) {
+      setNotice({
+        tone: "error",
+        text: getErrorMessage(
+          error,
+          "管理者権限を解除できませんでした。最後の管理者は解除できません。",
+        ),
+      });
+    } else {
+      setAdminUsers((current) =>
+        current.filter(
+          (administrator) => administrator.user_id !== profile.user_id,
+        ),
+      );
+      setNotice({
+        tone: "success",
+        text: `${profile.email}の管理者権限を解除しました。`,
+      });
+    }
+
+    setUpdatingAdminId(null);
   }
 
   function getUserWorkspaceCount(userId: string) {
@@ -592,9 +699,13 @@ export default function AdminConsole() {
         </section>
 
         {notice && (
-          <div className="app-notice error" role="status">
-            <ShieldAlert aria-hidden="true" size={17} />
-            <span>{notice}</span>
+          <div className={`app-notice ${notice.tone}`} role="status">
+            {notice.tone === "success" ? (
+              <CheckCircle2 aria-hidden="true" size={17} />
+            ) : (
+              <ShieldAlert aria-hidden="true" size={17} />
+            )}
+            <span>{notice.text}</span>
             <button type="button" onClick={() => setNotice(null)}>
               閉じる
             </button>
@@ -828,45 +939,110 @@ export default function AdminConsole() {
                 <h3>利用者一覧</h3>
                 <p>{filteredProfiles.length}名を表示</p>
               </div>
+              <span className="admin-count-label">
+                管理者 {adminUsers.length}名
+              </span>
             </div>
             <div className="admin-table-scroll">
-              <table className="admin-table">
+              <table className="admin-table admin-users-table">
                 <thead>
                   <tr>
                     <th>利用者</th>
+                    <th>権限</th>
                     <th>登録日時</th>
                     <th>最終ログイン</th>
                     <th>ワークスペース</th>
                     <th>投稿</th>
                     <th>ファイル</th>
+                    <th>
+                      <span className="sr-only">権限操作</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredProfiles.map((profile) => (
-                    <tr key={profile.user_id}>
-                      <td className="admin-primary-cell">
-                        <strong>{profile.email || "メール未登録"}</strong>
-                        <span>{profile.user_id.slice(0, 8)}</span>
-                      </td>
-                      <td>{formatDateTime(profile.created_at)}</td>
-                      <td>{formatDateTime(profile.last_sign_in_at)}</td>
-                      <td>{getUserWorkspaceCount(profile.user_id)}</td>
-                      <td>
-                        {
-                          posts.filter(
-                            (post) => post.created_by === profile.user_id,
-                          ).length
-                        }
-                      </td>
-                      <td>
-                        {
-                          files.filter(
-                            (file) => file.created_by === profile.user_id,
-                          ).length
-                        }
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredProfiles.map((profile) => {
+                    const isAdministrator = adminUsers.some(
+                      (administrator) =>
+                        administrator.user_id === profile.user_id,
+                    );
+                    const isCurrentUser = profile.user_id === user.id;
+
+                    return (
+                      <tr key={profile.user_id}>
+                        <td className="admin-primary-cell">
+                          <strong>{profile.email || "メール未登録"}</strong>
+                          <span>{profile.user_id.slice(0, 8)}</span>
+                        </td>
+                        <td>
+                          <span
+                            className={
+                              isAdministrator
+                                ? "admin-permission administrator"
+                                : "admin-permission member"
+                            }
+                          >
+                            {isAdministrator ? "管理者" : "一般"}
+                          </span>
+                        </td>
+                        <td>{formatDateTime(profile.created_at)}</td>
+                        <td>{formatDateTime(profile.last_sign_in_at)}</td>
+                        <td>{getUserWorkspaceCount(profile.user_id)}</td>
+                        <td>
+                          {
+                            posts.filter(
+                              (post) => post.created_by === profile.user_id,
+                            ).length
+                          }
+                        </td>
+                        <td>
+                          {
+                            files.filter(
+                              (file) => file.created_by === profile.user_id,
+                            ).length
+                          }
+                        </td>
+                        <td className="admin-action-cell">
+                          {isCurrentUser ? (
+                            <span className="admin-current-user">
+                              <ShieldCheck aria-hidden="true" size={15} />
+                              現在の管理者
+                            </span>
+                          ) : (
+                            <Button
+                              className={
+                                isAdministrator
+                                  ? "admin-permission-button revoke"
+                                  : "admin-permission-button"
+                              }
+                              size="sm"
+                              variant="secondary"
+                              isDisabled={updatingAdminId === profile.user_id}
+                              onPress={() =>
+                                isAdministrator
+                                  ? void revokeAdministratorAccess(profile)
+                                  : void grantAdministratorAccess(profile)
+                              }
+                            >
+                              {updatingAdminId === profile.user_id ? (
+                                <Loader2
+                                  className="spin"
+                                  aria-hidden="true"
+                                  size={15}
+                                />
+                              ) : isAdministrator ? (
+                                <UserMinus aria-hidden="true" size={15} />
+                              ) : (
+                                <UserPlus aria-hidden="true" size={15} />
+                              )}
+                              <span>
+                                {isAdministrator ? "権限を解除" : "管理者にする"}
+                              </span>
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -1706,6 +1706,15 @@ input:focus {
   margin-top: 4px;
 }
 
+.admin-count-label {
+  background: #eef2f7;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 5px 8px;
+}
+
 .admin-table-scroll {
   overflow: auto;
   width: 100%;
@@ -1716,6 +1725,10 @@ input:focus {
   font-size: 12px;
   min-width: 920px;
   width: 100%;
+}
+
+.admin-users-table {
+  min-width: 1120px;
 }
 
 .admin-table th,
@@ -1824,6 +1837,42 @@ input:focus {
 
 .admin-download-button {
   min-width: 72px;
+}
+
+.admin-permission {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 4px 8px;
+}
+
+.admin-permission.administrator {
+  background: #e6f4f1;
+  color: var(--teal);
+}
+
+.admin-permission.member {
+  background: #eef2f7;
+  color: var(--muted);
+}
+
+.admin-current-user {
+  align-items: center;
+  color: var(--teal);
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 800;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.admin-permission-button {
+  min-width: 112px;
+}
+
+.admin-permission-button.revoke {
+  color: #be123c;
 }
 
 .admin-empty {

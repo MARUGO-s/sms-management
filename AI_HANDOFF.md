@@ -20,8 +20,9 @@ The owner-only production deployment is:
 - Supabase Auth email/password and Google OAuth sign-in protect all app data.
 - Posts, history, channels, and file metadata are stored in Postgres. File bytes are stored in private Storage.
 - SNS secrets are written only through the authenticated `integration-secrets` Edge Function. Browser clients never read stored secret values.
-- `/admin` is an administrator-only console for all users, workspaces, posts, files, integration status, and audit history. It can update post status and create short-lived file download URLs, but it does not expose destructive actions.
+- `/admin` is an administrator-only console for all users, workspaces, posts, files, integration status, and audit history. It can update post status, create short-lived file download URLs, and grant or revoke administrator access from the user directory.
 - Administrator access is stored by Auth user ID in `social_admin_users`. Never hardcode administrator emails or IDs in frontend source or migrations.
+- Administrator changes require an existing registered user, are limited by RLS to current administrators, and are written to the audit log. The UI prevents self-revocation and the database prevents removal of the final administrator.
 - `social_audit_logs` records safe operation metadata only. It deliberately excludes post bodies and all rows from `social_integration_secrets`.
 - The Sites deployment project is recorded in `.openai/hosting.json`. Production variables are managed in Sites, not committed files.
 - Dropbox backup script: `scripts/backup-supabase-to-dropbox.mjs`.
@@ -87,3 +88,5 @@ The migration `20260726111630_fix_social_rls_recursion.sql` fixes the login-time
 The migration `20260726114941_allow_workspace_owner_returning.sql` allows a newly created workspace owner to read the row returned by the same insert statement.
 
 The migrations `20260726121622_add_social_admin_console.sql` and `20260726122528_consolidate_social_admin_rls.sql` add the administrator directory, user profile sync, safe audit logging, and consolidated administrator-aware RLS. The initial administrator was provisioned directly in production after migration; it is not stored in Git.
+
+The migration `20260726124138_manage_social_administrators.sql` lets administrators manage administrator access from the `/admin` user directory while preserving the final administrator and auditing grant/revoke actions.
