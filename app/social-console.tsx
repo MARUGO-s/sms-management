@@ -505,6 +505,34 @@ export default function SocialConsole() {
     setAuthLoading(false);
   }
 
+  async function signInWithGoogle() {
+    if (!supabase) return;
+    setAuthLoading(true);
+    setAuthMessage("");
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin,
+        skipBrowserRedirect: true,
+      },
+    });
+
+    if (error) {
+      setAuthMessage(error.message);
+      setAuthLoading(false);
+      return;
+    }
+
+    if (data.url) {
+      window.location.assign(data.url);
+      return;
+    }
+
+    setAuthMessage("Google認証を開始できませんでした。");
+    setAuthLoading(false);
+  }
+
   async function sendPasswordReset() {
     if (!supabase || !email.trim()) {
       setAuthMessage("メールアドレスを入力してください。");
@@ -876,6 +904,19 @@ export default function SocialConsole() {
               <p>業務データはアカウントごとに保護されます。</p>
             </div>
           </div>
+          <Button
+            className="auth-provider-button"
+            type="button"
+            variant="secondary"
+            isDisabled={authLoading}
+            onPress={() => void signInWithGoogle()}
+          >
+            <KeyRound aria-hidden="true" size={18} />
+            <span>Googleで続ける</span>
+          </Button>
+          <div className="auth-divider" aria-hidden="true">
+            <span>または</span>
+          </div>
           <form className="auth-form" onSubmit={handleAuth}>
             <label>
               <span>メールアドレス</span>
@@ -896,7 +937,7 @@ export default function SocialConsole() {
                 autoComplete={
                   authMode === "signin" ? "current-password" : "new-password"
                 }
-                minLength={8}
+                minLength={12}
                 required
               />
             </label>

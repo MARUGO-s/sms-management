@@ -31,6 +31,7 @@ test("server-renders the Instatic TalksX operations console", async () => {
   const html = await response.text();
   assert.match(html, /<title>Instatic TalksX<\/title>/i);
   assert.match(html, /ログイン/);
+  assert.match(html, /Googleで続ける/);
   assert.match(html, /業務データはアカウントごとに保護されます/);
   assert.doesNotMatch(html, /Your site is taking shape|react-loading-skeleton/i);
 });

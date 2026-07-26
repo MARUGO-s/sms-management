@@ -1191,6 +1191,28 @@ input:focus {
   gap: 14px;
 }
 
+.auth-provider-button {
+  justify-content: center;
+  min-height: 42px;
+  width: 100%;
+}
+
+.auth-divider {
+  align-items: center;
+  color: var(--muted);
+  display: grid;
+  font-size: 12px;
+  gap: 10px;
+  grid-template-columns: 1fr auto 1fr;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  background: var(--line);
+  content: "";
+  height: 1px;
+}
+
 .auth-form label {
   display: grid;
   font-size: 13px;

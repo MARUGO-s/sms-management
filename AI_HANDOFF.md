@@ -17,7 +17,7 @@ The owner-only production deployment is:
 - Supabase tables: `social_workspaces`, `social_workspace_members`, `social_posts`, `social_post_channels`, `social_post_files`, `social_integrations`, `social_integration_secrets`.
 - Private Supabase Storage bucket: `post-files`.
 - RLS policies are enabled for authenticated users. Workspace membership checks run through non-exposed `private` schema functions to prevent policy recursion.
-- Supabase Auth email/password sign-in protects all app data.
+- Supabase Auth email/password and Google OAuth sign-in protect all app data.
 - Posts, history, channels, and file metadata are stored in Postgres. File bytes are stored in private Storage.
 - SNS secrets are written only through the authenticated `integration-secrets` Edge Function. Browser clients never read stored secret values.
 - The Sites deployment project is recorded in `.openai/hosting.json`. Production variables are managed in Sites, not committed files.
@@ -46,14 +46,16 @@ supabase db advisors --linked --type all --level warn --fail-on none
 
 The current production app safely stores users, reservations, history, files, and SNS credentials. Actual publishing, inbox sync, webhooks, and platform analytics still require approved developer apps and provider-specific OAuth/publishing implementations for Instagram, TikTok, X, and Threads. The UI deliberately labels those areas as pending instead of showing mock production data.
 
-## Required Supabase admin setting
+## Supabase Auth settings
 
-Email confirmation is enabled. Before inviting production users, an owner must open Supabase Dashboard > Authentication > URL Configuration and set:
+Email confirmation and Google OAuth are enabled. Supabase Dashboard > Authentication > URL Configuration is configured with:
 
 - Site URL: `https://instatic-talksx.yoshito0428.chatgpt.site`
 - Redirect URLs: `https://instatic-talksx.yoshito0428.chatgpt.site/**` and `http://localhost:3000/**`
 
-The currently authenticated Supabase CLI account can deploy migrations and functions but receives `403` for the Auth configuration Management API. Do not work around this with database changes; complete it with a Supabase project owner account.
+Google OAuth credentials are stored only in Supabase and Google Auth Platform. Never add the Google Client Secret to Git, Dropbox, screenshots, or this handoff file.
+
+Google OAuth was verified by confirming that the Supabase authorize endpoint redirects to `accounts.google.com`.
 
 Supabase Advisors currently reports one Auth warning: leaked-password protection is disabled. Enable it in the Supabase Authentication password-security settings before expanding access beyond the owner.
 
@@ -73,3 +75,5 @@ Branch: `main`
 Before changing the database, create a migration with `supabase migration new <name>`, apply it with `supabase db push --linked`, verify it with `supabase db query --linked`, and run Supabase Advisors.
 
 The migration `20260726111630_fix_social_rls_recursion.sql` fixes the login-time workspace load failure caused by circular RLS policy references. Its authenticated create/read verification must remain rollback-only so no test workspace is left in production.
+
+The migration `20260726114941_allow_workspace_owner_returning.sql` allows a newly created workspace owner to read the row returned by the same insert statement.
