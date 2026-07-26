@@ -72,3 +72,31 @@ test("store affiliation and administrator schedules remain wired into the app", 
   assert.match(migrationSource, /create table public\.social_stores/);
   assert.match(migrationSource, /'BLU NERO'/);
 });
+
+test("video crop jobs keep originals and use the protected worker flow", async () => {
+  const [consoleSource, editorSource, migrationSource, workerSource] =
+    await Promise.all([
+      readFile(new URL("../app/social-console.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/media-editor.tsx", import.meta.url), "utf8"),
+      readFile(
+        new URL(
+          "../supabase/migrations/20260726135609_add_social_media_processing.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL("../workers/media-processor/processor.mjs", import.meta.url),
+        "utf8",
+      ),
+    ]);
+
+  assert.match(consoleSource, /動画をクロップ|クロップ設定/);
+  assert.match(consoleSource, /media-jobs/);
+  assert.match(consoleSource, /処理を再実行/);
+  assert.match(editorSource, /"1:1".*"4:5".*"9:16".*"16:9"/s);
+  assert.match(migrationSource, /create table public\.social_media_jobs/);
+  assert.match(migrationSource, /media_variant/);
+  assert.match(workerSource, /generated_from_file_id/);
+  assert.match(workerSource, /libx264/);
+});

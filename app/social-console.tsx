@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Clock3,
   Cloud,
+  Crop,
   Database,
   Download,
   Eye,
@@ -33,6 +34,7 @@ import {
   Settings2,
   ShieldCheck,
   Trash2,
+  Video,
   Wand2,
   type LucideIcon,
 } from "lucide-react";
@@ -44,6 +46,10 @@ import {
   type FormEvent,
 } from "react";
 import { supabase } from "./lib/supabase";
+import MediaEditor, {
+  defaultMediaCrop,
+  type MediaCropConfig,
+} from "./media-editor";
 
 type ChannelId = "instagram" | "tiktok" | "x" | "threads";
 type ViewId =
@@ -71,10 +77,13 @@ type WorkspaceRow = {
 };
 
 type LocalAttachment = {
+  id: string;
   file: File;
   name: string;
   size: number;
   type: string;
+  previewUrl: string;
+  crop: MediaCropConfig | null;
 };
 
 type SavedFile = {
@@ -83,6 +92,29 @@ type SavedFile = {
   size: number;
   type: string;
   storagePath: string;
+  variant: "original" | "processed";
+  mediaJob: {
+    id: string;
+    status: MediaJobStatus;
+    aspect: string;
+    errorMessage: string;
+  } | null;
+};
+
+type MediaJobStatus =
+  | "queued"
+  | "processing"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+type MediaJobRow = {
+  id: string;
+  source_file_id: string;
+  output_file_id: string | null;
+  status: MediaJobStatus;
+  crop_config: MediaCropConfig;
+  error_message: string;
 };
 
 type HistoryRecord = {
@@ -134,6 +166,7 @@ type DbPostRow = {
     file_size: number;
     content_type: string;
     storage_path: string;
+    media_variant: "original" | "processed";
   }> | null;
 };
 
@@ -251,6 +284,12 @@ export default function SocialConsole() {
   const [history, setHistory] = useState<HistoryRecord[]>([]);
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   const [attachedFiles, setAttachedFiles] = useState<LocalAttachment[]>([]);
+  const [editingAttachmentId, setEditingAttachmentId] = useState<string | null>(
+    null,
+  );
+  const [dispatchingMediaJobId, setDispatchingMediaJobId] = useState<
+    string | null
+  >(null);
   const [activeIntegrationId, setActiveIntegrationId] =
     useState<ChannelId>("instagram");
   const [integrations, setIntegrations] = useState<
@@ -378,6 +417,9 @@ export default function SocialConsole() {
   }, [stores]);
   const selectedHistory = history.find(
     (record) => record.id === selectedHistoryId,
+  );
+  const editingAttachment = attachedFiles.find(
+    (file) => file.id === editingAttachmentId,
   );
   const activeIntegration = integrations[activeIntegrationId];
   const activeChannel = channelById[activeIntegrationId];
@@ -581,24 +623,39 @@ export default function SocialConsole() {
       setStoreSelectionRequired(false);
       window.localStorage.removeItem(pendingStoreKey);
 
-      const [postsResult, integrationsResult] = await Promise.all([
-        supabase
-          .from("social_posts")
-          .select(
-            "id, title, body, scheduled_at, status, owner_name, format, created_at, social_post_channels(channel), social_post_files(id, file_name, file_size, content_type, storage_path)",
-          )
-          .eq("workspace_id", activeWorkspace.id)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("social_integrations")
-          .select(
-            "channel, app_id, callback_url, scopes, status, updated_at",
-          )
-          .eq("workspace_id", activeWorkspace.id),
-      ]);
+      const [postsResult, integrationsResult, mediaJobsResult] =
+        await Promise.all([
+          supabase
+            .from("social_posts")
+            .select(
+              "id, title, body, scheduled_at, status, owner_name, format, created_at, social_post_channels(channel), social_post_files(id, file_name, file_size, content_type, storage_path, media_variant)",
+            )
+            .eq("workspace_id", activeWorkspace.id)
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("social_integrations")
+            .select(
+              "channel, app_id, callback_url, scopes, status, updated_at",
+            )
+            .eq("workspace_id", activeWorkspace.id),
+          supabase
+            .from("social_media_jobs")
+            .select(
+              "id, source_file_id, output_file_id, status, crop_config, error_message",
+            )
+            .eq("workspace_id", activeWorkspace.id)
+            .order("created_at", { ascending: false }),
+        ]);
 
       if (postsResult.error) throw postsResult.error;
       if (integrationsResult.error) throw integrationsResult.error;
+      if (mediaJobsResult.error) throw mediaJobsResult.error;
+
+      const mediaJobByFileId = new Map<string, MediaJobRow>();
+      for (const job of (mediaJobsResult.data ?? []) as MediaJobRow[]) {
+        mediaJobByFileId.set(job.source_file_id, job);
+        if (job.output_file_id) mediaJobByFileId.set(job.output_file_id, job);
+      }
 
       const records = ((postsResult.data ?? []) as unknown as DbPostRow[]).map(
         (post) => ({
@@ -619,6 +676,17 @@ export default function SocialConsole() {
             size: Number(file.file_size),
             type: file.content_type,
             storagePath: file.storage_path,
+            variant: file.media_variant,
+            mediaJob: mediaJobByFileId.has(file.id)
+              ? {
+                  id: mediaJobByFileId.get(file.id)!.id,
+                  status: mediaJobByFileId.get(file.id)!.status,
+                  aspect:
+                    mediaJobByFileId.get(file.id)!.crop_config.aspect,
+                  errorMessage:
+                    mediaJobByFileId.get(file.id)!.error_message,
+                }
+              : null,
           })),
         }),
       );
@@ -829,22 +897,43 @@ export default function SocialConsole() {
 
     const available = Math.max(0, 4 - attachedFiles.length);
     const accepted = picked
-      .filter((file) => file.size <= 20 * 1024 * 1024)
+      .filter((file) => file.size <= 50 * 1024 * 1024)
       .slice(0, available)
       .map((file) => ({
+        id: crypto.randomUUID(),
         file,
         name: file.name,
         size: file.size,
         type: file.type || "application/octet-stream",
+        previewUrl: file.type.startsWith("video/")
+          ? URL.createObjectURL(file)
+          : "",
+        crop: null,
       }));
 
     setAttachedFiles((current) => [...current, ...accepted]);
     if (accepted.length !== picked.length) {
       setNotice({
         tone: "info",
-        text: "添付は最大4件、1ファイル20MBまでです。",
+        text: "添付は最大4件、1ファイル50MBまでです。",
       });
     }
+  }
+
+  function removeAttachment(id: string) {
+    setAttachedFiles((current) => {
+      const target = current.find((file) => file.id === id);
+      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
+      return current.filter((file) => file.id !== id);
+    });
+    if (editingAttachmentId === id) setEditingAttachmentId(null);
+  }
+
+  function saveAttachmentCrop(id: string, crop: MediaCropConfig) {
+    setAttachedFiles((current) =>
+      current.map((file) => (file.id === id ? { ...file, crop } : file)),
+    );
+    setEditingAttachmentId(null);
   }
 
   async function schedulePost() {
@@ -866,6 +955,8 @@ export default function SocialConsole() {
     setSavingPost(true);
     setNotice(null);
     let postId: string | null = null;
+    let mediaJobCount = 0;
+    let cloudRunConnected = true;
 
     try {
       const title =
@@ -913,7 +1004,7 @@ export default function SocialConsole() {
           });
         if (uploadError) throw uploadError;
 
-        const { error: fileError } = await supabase
+        const { data: savedFile, error: fileError } = await supabase
           .from("social_post_files")
           .insert({
             workspace_id: workspaceId,
@@ -923,16 +1014,53 @@ export default function SocialConsole() {
             content_type: attachment.type,
             file_size: attachment.size,
             created_by: user.id,
-          });
+            media_variant: "original",
+          })
+          .select("id")
+          .single();
         if (fileError) throw fileError;
+
+        if (attachment.type.startsWith("video/") && attachment.crop) {
+          const { data: mediaJob, error: mediaJobError } = await supabase
+            .from("social_media_jobs")
+            .insert({
+              workspace_id: workspaceId,
+              post_id: post.id,
+              source_file_id: savedFile.id,
+              requested_by: user.id,
+              operation: "crop",
+              crop_config: attachment.crop,
+              status: "queued",
+            })
+            .select("id")
+            .single();
+          if (mediaJobError) throw mediaJobError;
+          mediaJobCount += 1;
+
+          const { data: dispatchData, error: dispatchError } =
+            await supabase.functions.invoke("media-jobs", {
+              body: { action: "dispatch", jobId: mediaJob.id },
+            });
+          if (dispatchError || dispatchData?.configured === false) {
+            cloudRunConnected = false;
+          }
+        }
       }
 
+      for (const attachment of attachedFiles) {
+        if (attachment.previewUrl) URL.revokeObjectURL(attachment.previewUrl);
+      }
       setPostText("");
       setScheduledAt("");
       setAttachedFiles([]);
       setNotice({
-        tone: "success",
-        text: "予約投稿と添付ファイルをSupabaseへ保存しました。",
+        tone: cloudRunConnected ? "success" : "info",
+        text:
+          mediaJobCount === 0
+            ? "予約投稿と添付ファイルをSupabaseへ保存しました。"
+            : cloudRunConnected
+              ? `予約投稿を保存し、動画処理${mediaJobCount}件を開始しました。`
+              : `予約投稿を保存し、動画処理${mediaJobCount}件をキューへ登録しました。Cloud Run接続後に処理されます。`,
       });
       await loadWorkspaceData(user);
       setActiveView("calendar");
@@ -962,6 +1090,33 @@ export default function SocialConsole() {
       return;
     }
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }
+
+  async function dispatchMediaJob(jobId: string) {
+    if (!supabase || !user) return;
+    setDispatchingMediaJobId(jobId);
+    setNotice(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("media-jobs", {
+        body: { action: "dispatch", jobId },
+      });
+      if (error) throw error;
+      setNotice({
+        tone: data?.configured === false ? "info" : "success",
+        text:
+          data?.configured === false
+            ? "処理待ちとして保存されています。Cloud Run接続後に再実行してください。"
+            : "メディア処理を開始しました。",
+      });
+      await loadWorkspaceData(user);
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        text: getErrorMessage(error, "メディア処理を開始できませんでした。"),
+      });
+    } finally {
+      setDispatchingMediaJobId(null);
+    }
   }
 
   function updateIntegration(
@@ -1311,7 +1466,7 @@ export default function SocialConsole() {
           <button
             className="store-onboarding-signout"
             type="button"
-            onClick={() => void supabase.auth.signOut()}
+            onClick={() => void supabase?.auth.signOut()}
           >
             別のアカウントでログイン
           </button>
@@ -1321,7 +1476,8 @@ export default function SocialConsole() {
   }
 
   return (
-    <main className="app-shell">
+    <>
+      <main className="app-shell">
       <aside className="sidebar" aria-label="SNS管理メニュー">
         <div className="brand-lockup">
           <div className="brand-mark">IX</div>
@@ -1403,7 +1559,7 @@ export default function SocialConsole() {
             className="icon-button"
             type="button"
             aria-label="ログアウト"
-            onClick={() => void supabase.auth.signOut()}
+            onClick={() => void supabase?.auth.signOut()}
           >
             <LogOut aria-hidden="true" size={17} />
           </button>
@@ -1553,40 +1709,59 @@ export default function SocialConsole() {
                   />
                 </label>
                 <span className="file-upload-note">
-                  最大4ファイル / 1ファイル20MBまで
+                  最大4ファイル / 1ファイル50MBまで
                 </span>
               </div>
 
               {attachedFiles.length > 0 && (
-                <div className="attachment-list" aria-label="添付ファイル">
-                  {attachedFiles.map((file) => (
-                    <div
-                      className="attachment-chip"
-                      key={`${file.name}-${file.size}`}
-                    >
-                      <FileText aria-hidden="true" size={15} />
-                      <span>{file.name}</span>
-                      <small>{formatFileSize(file.size)}</small>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setAttachedFiles((current) =>
-                            current.filter(
-                              (item) =>
-                                !(
-                                  item.name === file.name &&
-                                  item.size === file.size
-                                ),
-                            ),
-                          )
-                        }
-                        aria-label={`${file.name}を削除`}
-                      >
-                        <Trash2 aria-hidden="true" size={14} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                <>
+                  <div className="attachment-list" aria-label="添付ファイル">
+                    {attachedFiles.map((file) => (
+                      <div className="attachment-chip" key={file.id}>
+                        {file.type.startsWith("video/") ? (
+                          <Video aria-hidden="true" size={15} />
+                        ) : (
+                          <FileText aria-hidden="true" size={15} />
+                        )}
+                        <span>
+                          {file.name}
+                          {file.crop && (
+                            <em>
+                              {file.crop.aspect} / 拡大{file.crop.zoom}%
+                            </em>
+                          )}
+                        </span>
+                        <small>{formatFileSize(file.size)}</small>
+                        {file.type.startsWith("video/") && (
+                          <button
+                            aria-label={`${file.name}のクロップ設定`}
+                            className="attachment-edit-button"
+                            onClick={() => setEditingAttachmentId(file.id)}
+                            title="クロップ設定"
+                            type="button"
+                          >
+                            <Crop aria-hidden="true" size={14} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(file.id)}
+                          aria-label={`${file.name}を削除`}
+                        >
+                          <Trash2 aria-hidden="true" size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  {attachedFiles.some(
+                    (file) => file.type.startsWith("video/") && file.crop,
+                  ) && (
+                    <p className="media-processing-note">
+                      <Cloud aria-hidden="true" size={15} />
+                      元動画を保持し、クロップ済みMP4をバックグラウンドで生成します。
+                    </p>
+                  )}
+                </>
               )}
 
               <div className="channel-toggle-grid" aria-label="投稿先">
@@ -1843,19 +2018,56 @@ export default function SocialConsole() {
                     </div>
                     {selectedHistory.files.length ? (
                       selectedHistory.files.map((file) => (
-                        <button
-                          className="saved-file-row"
-                          type="button"
-                          onClick={() => void downloadFile(file)}
-                          key={file.id}
-                        >
-                          <FileText aria-hidden="true" size={17} />
-                          <span>
-                            <strong>{file.name}</strong>
-                            <small>{formatFileSize(file.size)}</small>
-                          </span>
-                          <Download aria-hidden="true" size={16} />
-                        </button>
+                        <div className="saved-file-item" key={file.id}>
+                          <button
+                            className="saved-file-row"
+                            type="button"
+                            onClick={() => void downloadFile(file)}
+                          >
+                            <FileText aria-hidden="true" size={17} />
+                            <span>
+                              <strong>{file.name}</strong>
+                              <small>
+                                {formatFileSize(file.size)}
+                                {file.variant === "processed" && " / 変換済み"}
+                                {file.mediaJob?.status === "queued" &&
+                                  ` / ${file.mediaJob.aspect} 処理待ち`}
+                                {file.mediaJob?.status === "processing" &&
+                                  ` / ${file.mediaJob.aspect} 処理中`}
+                                {file.mediaJob?.status === "failed" &&
+                                  " / 動画処理失敗"}
+                              </small>
+                            </span>
+                            <Download aria-hidden="true" size={16} />
+                          </button>
+                          {file.variant === "original" &&
+                            file.mediaJob &&
+                            ["queued", "failed"].includes(
+                              file.mediaJob.status,
+                            ) && (
+                              <button
+                                className="media-job-retry"
+                                disabled={
+                                  dispatchingMediaJobId === file.mediaJob.id
+                                }
+                                onClick={() =>
+                                  void dispatchMediaJob(file.mediaJob!.id)
+                                }
+                                type="button"
+                              >
+                                {dispatchingMediaJobId === file.mediaJob.id ? (
+                                  <Loader2
+                                    aria-hidden="true"
+                                    className="spin"
+                                    size={14}
+                                  />
+                                ) : (
+                                  <RefreshCcw aria-hidden="true" size={14} />
+                                )}
+                                <span>処理を再実行</span>
+                              </button>
+                            )}
+                        </div>
                       ))
                     ) : (
                       <p className="empty-note">
@@ -2229,7 +2441,17 @@ export default function SocialConsole() {
             </aside>
           </section>
         )}
-      </section>
-    </main>
+        </section>
+      </main>
+      {editingAttachment?.previewUrl && (
+        <MediaEditor
+          fileName={editingAttachment.name}
+          onClose={() => setEditingAttachmentId(null)}
+          onSave={(crop) => saveAttachmentCrop(editingAttachment.id, crop)}
+          previewUrl={editingAttachment.previewUrl}
+          value={editingAttachment.crop ?? defaultMediaCrop}
+        />
+      )}
+    </>
   );
 }

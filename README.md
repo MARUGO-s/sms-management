@@ -9,6 +9,8 @@ Instagram、TikTok、X、Threadsの投稿予約、履歴、添付ファイル、
 - 新規登録時の所属店舗選択と、既存利用者向けの初回所属設定
 - 店舗・ワークスペース単位の投稿予約と履歴保存
 - 非公開Supabase Storageへのファイル保存と期限付きダウンロード
+- 1:1、4:5、9:16、16:9の動画クロップ設定と処理履歴
+- 元動画を保持したままCloud Run Jobsでクロップ済みMP4を生成する非同期処理
 - SNS APIの公開設定と秘密情報の分離保存
 - RLSによる利用者・ワークスペース単位のアクセス制御
 - 通常の運用画面で現在の所属店舗を常時表示
@@ -45,10 +47,13 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key
 ```bash
 supabase db push --linked
 supabase functions deploy integration-secrets --use-api
+supabase functions deploy media-jobs --use-api
 supabase db advisors --linked --type all --level warn --fail-on none
 ```
 
 データベース変更は必ず `supabase migration new <name>` で作成し、`supabase/migrations/` をGitへ保存します。
+
+動画クロップの画面・ジョブ登録・処理履歴はSupabase Freeで利用できます。実際のFFmpeg処理には別途Cloud Run Jobの接続が必要です。接続前の処理は`queued`として残り、履歴から再実行できます。Cloud Runの設定手順は`workers/media-processor/README.md`にあります。
 
 ## Backup
 

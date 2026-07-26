@@ -3,10 +3,10 @@
 ## 文書情報
 
 - 記録日時: 2026-07-26 21:50:36 JST
-- 最終更新日時: 2026-07-26 22:32:53 JST
+- 最終更新日時: 2026-07-26 23:20 JST
 - 対象リポジトリ: `https://github.com/MARUGO-s/sms-management.git`
 - 対象ブランチ: `main`
-- 今回の作業開始時HEAD: `c7f462e737ba20c3233f3620baea999785f175fd`
+- 今回の作業開始時HEAD: `776feed5ca0b22e0d34d8ad307884faf87b2b124`
 - ローカル作業場所: `/Users/yoshito/Documents/New project`
 - 本番URL: `https://instatic-talksx.yoshito0428.chatgpt.site`
 - 管理者URL: `https://instatic-talksx.yoshito0428.chatgpt.site/admin`
@@ -62,6 +62,10 @@ Instatic TalksXは、Instagram、TikTok、X、Threadsの運用情報を一括管
 - 投稿本文、予約日時、投稿先、ステータスの保存
 - 投稿履歴の閲覧
 - 非公開Supabase Storageへの添付ファイル保存
+- 1ファイル50MBまでのFreeプラン向け添付制限
+- 動画の1:1、4:5、9:16、16:9クロップ設定
+- 元動画を保持する非同期メディア処理キューと処理履歴
+- Cloud Run Jobs向けFFmpeg動画クロップワーカー
 - 期限付きURLによるファイルダウンロード
 - SNS連携設定のメタデータ保存
 - SNS APIシークレットのブラウザ非公開保存
@@ -72,7 +76,7 @@ Instatic TalksXは、Instagram、TikTok、X、Threadsの運用情報を一括管
 - 管理者権限変更を含む監査ログ
 - GitHub、Dropbox、Sitesへの引き継ぎ経路
 
-現時点では実際のSNS公開処理、コメント・DM同期、Webhook受信、各SNSの分析値取得は未実装。各SNSの開発者アプリ審査、OAuth認可、公開API実装が別途必要。
+現時点では実際のSNS公開処理、コメント・DM同期、Webhook受信、各SNSの分析値取得は未実装。各SNSの開発者アプリ審査、OAuth認可、公開API実装が別途必要。動画クロップの画面、キュー、Edge Function、FFmpegワーカーは実装済みだが、Cloud Run実行環境はGCPプロジェクト未選定のため未接続。接続前のジョブは`queued`としてSupabaseへ残る。
 
 ## 本番データのスナップショット
 
@@ -164,10 +168,15 @@ Instatic TalksXは、Instagram、TikTok、X、Threadsの運用情報を一括管
 ### 添付ファイル
 
 - 1投稿につき最大4ファイル
-- 1ファイル20MBまで
+- 1ファイル50MBまで
 - ファイル本体は非公開Storage bucket `post-files`へ保存
 - ファイル名、MIME type、サイズ、Storage pathは`social_post_files`へ保存
 - ダウンロード時だけ60秒の署名付きURLを生成
+- 動画は1:1、4:5、9:16、16:9のクロップ範囲を設定可能
+- クロップ設定済み動画は`social_media_jobs`へ非同期ジョブとして保存
+- 元動画を上書きせず、処理済みMP4を別ファイルとして追加
+- 処理待ち、処理中、完了、失敗を履歴で確認
+- 処理待ち・失敗ジョブは履歴から再実行可能
 
 ### 予約
 
@@ -337,6 +346,19 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
 - Storage内ファイルのメタデータ
 - Storage pathは一意
 - ファイルサイズは0以上
+- `media_variant`で元ファイルと処理済みファイルを区別
+- `generated_from_file_id`で処理済みファイルから元ファイルを追跡
+
+### `social_media_jobs`
+
+- 動画クロップの非同期処理要求
+- 対象ワークスペース、投稿、元ファイル、依頼者を保持
+- クロップ比率、横位置、縦位置、拡大率をJSONで保持
+- 状態は`queued`、`processing`、`completed`、`failed`、`cancelled`
+- 処理済みファイル、Cloud Run実行名、安全なエラー情報を保持
+- 通常利用者は所属ワークスペース内だけ閲覧・作成
+- ジョブの元ファイルは同一ワークスペース・同一投稿・同一作成者の動画に限定
+- service roleだけがCloud Runワーカーとして処理結果を更新
 
 ### `social_integrations`
 
@@ -380,7 +402,7 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
 
 - Bucket ID: `post-files`
 - Public設定: false
-- 1ファイル上限: 20MB
+- 1ファイル上限: 50MB
 - 通常利用者は所属ワークスペースのファイルだけ操作可能
 - アプリ管理者は全ファイルを読み取り可能
 - ファイルの更新・削除権限は管理者へ自動拡張していない
@@ -397,6 +419,17 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
   - 保存済みシークレットの有無確認
   - SNSシークレット削除
 - シークレット値をブラウザへ返さない
+
+### `media-jobs`
+
+- 状態: ACTIVE
+- JWT検証: 有効
+- 役割:
+  - 認証済み利用者が閲覧可能なメディアジョブだけを受理
+  - Cloud Run Jobへ`MEDIA_JOB_ID`を安全に渡して実行
+  - Cloud Run未接続時はジョブを失敗させず`queued`で維持
+  - Dispatch失敗時は安全なエラー情報だけを保存
+- Google service-account JSONはSupabase Secretsへ保存する設計で、Gitには保存しない
 
 ## 適用済みマイグレーション
 
@@ -428,6 +461,17 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
 ### `20260726114941_allow_workspace_owner_returning.sql`
 
 - 新規ワークスペース作成直後の`insert ... returning`を所有者が読めるよう修正
+
+### `20260726135609_add_social_media_processing.sql`
+
+- Storage上限をFreeプラン向け50MBへ変更
+- 元ファイルと処理済みファイルの系譜を追加
+- `social_media_jobs`、RLS、監査trigger、service role権限を追加
+
+### `20260726141243_fix_media_job_rls_qualification.sql`
+
+- メディアジョブ作成RLSの外側テーブル参照を明示
+- 元動画とジョブのワークスペース・投稿一致を厳密化
 
 ### `20260726121622_add_social_admin_console.sql`
 
@@ -662,7 +706,16 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
 - Docker Desktopは記録時に起動していない
 - `supabase db push --linked`のマイグレーション適用自体は成功
 - 適用後のローカルmigration catalog cache生成だけがDocker未起動警告を出す
+- FFmpegワーカーの計算テストは成功したが、コンテナimage buildはDocker未起動のため未実行
 - ローカルSupabase stackを起動する場合はDocker Desktopが必要
+
+### Cloud Run
+
+- ワーカー実装とデプロイ手順は`workers/media-processor/`にある
+- GCPプロジェクト、課金設定、Artifact Registry、実行用service accountは未選定・未作成
+- Supabase側のGoogleシークレットも未設定
+- Cloud Run接続前でも予約投稿、元動画、クロップ設定、処理待ち履歴はSupabase Freeへ保存される
+- 実際のFFmpeg処理完了まではCloud Run接続が必要
 
 ### ローカル開発サーバー
 
@@ -677,7 +730,7 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
 - 各SNSのOAuth認可開始・Callback処理
 - Access Token更新
 - 実際の投稿公開
-- 動画アップロード処理
+- 各SNS APIへの処理済み動画アップロード
 - 公開結果の取得
 - 公開失敗時の再試行
 - Rate limit制御
@@ -701,6 +754,7 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
 
 ### 運用
 
+- Cloud Run JobのGCP本番接続
 - 定期実行ワーカー
 - 予約時刻になった投稿の自動公開
 - Dropboxバックアップの自動実行
@@ -719,7 +773,18 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
 
 ## 次に着手する優先順位
 
-### 優先度1: SNS OAuth
+### 優先度1: Cloud Run動画処理の接続
+
+1. 所有者が使用するGCPプロジェクトを指定
+2. 課金アカウントと必要APIを有効化
+3. Artifact Registryへworker imageをbuild/push
+4. Supabase URLとserver-only keyをGoogle Secret Managerへ保存
+5. Dispatcher用service account JSONをSupabase Secretsへ保存
+6. 実動画1件で元動画保持、処理済みMP4、履歴状態を確認
+
+具体的なコマンドと秘密情報の配置先は`workers/media-processor/README.md`を参照。
+
+### 優先度2: SNS OAuth
 
 1. 連携対象SNSを1つに絞る
 2. 開発者アプリのClient ID、Client Secretを準備
@@ -729,7 +794,7 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
 
 最初はInstagramまたはThreadsを推奨。複数SNSを同時に実装しない。
 
-### 優先度2: 実際の投稿公開
+### 優先度3: 実際の投稿公開
 
 1. 画像のみの投稿から開始
 2. Provider APIへ公開
@@ -738,7 +803,7 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
 5. 失敗時に`failed`と安全なエラーコードを保存
 6. Retry可能な状態を設計
 
-### 優先度3: 予約実行
+### 優先度4: 予約実行
 
 1. 実行対象投稿を取得するserver-only処理
 2. 重複実行防止
@@ -746,7 +811,7 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
 4. 実行履歴
 5. 失敗通知
 
-### 優先度4: バックアップ
+### 優先度5: バックアップ
 
 1. Dropbox secretsフォルダへserver-only keyを配置
 2. `npm run backup:dropbox`を手動実行
@@ -803,6 +868,7 @@ supabase db lint --linked --level warning
 supabase db advisors --linked --type all --level warn --fail-on none
 supabase functions list --project-ref xpdrewhzisycjdtcvvey
 supabase functions deploy integration-secrets --use-api
+supabase functions deploy media-jobs --use-api
 ```
 
 ## 完了条件の基準
@@ -866,3 +932,18 @@ supabase functions deploy integration-secrets --use-api
 - Dropbox: 除外規則を維持してソースミラーへ同期し、`PROJECT_PROGRESS.md`の一致と`.env*`除外を再確認する。
 - 未完了事項: 既存利用者1名と既存ワークスペース1件は所属店舗未設定。利用者が次回通常画面で正しい店舗を一度選択する必要がある。管理者による後からの所属店舗変更UIは未実装。
 - 次の作業: 利用者が所属店舗を選択後、店舗名が通常画面へ表示されることを確認。その後、優先するSNSのOAuthと実投稿処理へ進む。
+
+### 2026-07-26 23:20 JST - Supabase Free向け動画クロップ基盤を追加
+
+- 依頼: Supabase Freeを維持したまま、Cloud Run Jobsで動画をクロップできる機能を実装する。
+- 実施内容: 動画プレビュー、1:1・4:5・9:16・16:9、位置・拡大設定、元動画保持、非同期処理キュー、履歴の状態表示・再実行を実装。Cloud Run向けNode.js/FFmpegワーカーと安全なデプロイ手順を追加。
+- 変更ファイル: `app/social-console.tsx`、`app/media-editor.tsx`、`app/globals.css`、`workers/media-processor/`、`supabase/functions/media-jobs/`、migration 2件、テスト、README、AI handoff、進行記録。
+- DB・設定変更: `20260726135609_add_social_media_processing.sql`と`20260726141243_fix_media_job_rls_qualification.sql`を本番Supabaseへ適用。Storage上限を50MBへ変更し、`social_media_jobs`、ファイル系譜、RLS、監査triggerを追加。`media-jobs` Edge FunctionをJWT検証付きで本番公開。
+- RLS検証: `anon`にテーブル権限がないこと、RLS有効、認証済み利用者の正しい動画ジョブ作成成功、元動画とジョブの投稿・ワークスペース一致条件を確認。検証データはTransactionとRollbackを使用し、本番残存0件を確認。
+- テスト: `npm test` 7件成功、`npm run build`成功、`supabase db lint`エラー0、Edge Function未認証POSTは401、Supabase Advisorsは既知のPro限定Auth警告1件のみ。
+- セキュリティ: service role、Google service-account JSON、SNSシークレットはGitへ追加していない。Cloud Run側はGoogle Secret Manager、Dispatcher側はSupabase Secretsへ保存する手順。
+- デプロイ: Supabase DBと`media-jobs` Edge Functionは本番反映済み。Sitesはこの記録時点では公開処理中。
+- Git: この記録を含む実装を`main`へcommit・pushする。
+- Dropbox: Git push後に`.env*`を除外してソースミラーへ同期する。
+- 未完了事項: Cloud Run Job自体はGCPプロジェクト未選定、`gcloud`未導入、Docker未起動、server-only key未配置のため未デプロイ。接続前のジョブは`queued`で保持される。
+- 次の作業: 使用するGCPプロジェクトを所有者が指定後、`workers/media-processor/README.md`に従ってCloud Runを接続し、50MB未満の実動画1件で処理完了を確認する。

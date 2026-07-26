@@ -14,8 +14,8 @@ The owner-only production deployment is:
 - HeroUI v3 is installed and applied to key action buttons.
 - Supabase project is linked with ref `xpdrewhzisycjdtcvvey`.
 - Supabase schema is deployed through `supabase/migrations/`.
-- Supabase tables: `social_stores`, `social_workspaces`, `social_workspace_members`, `social_posts`, `social_post_channels`, `social_post_files`, `social_integrations`, `social_integration_secrets`, `social_admin_users`, `social_user_profiles`, `social_audit_logs`.
-- Private Supabase Storage bucket: `post-files`.
+- Supabase tables: `social_stores`, `social_workspaces`, `social_workspace_members`, `social_posts`, `social_post_channels`, `social_post_files`, `social_media_jobs`, `social_integrations`, `social_integration_secrets`, `social_admin_users`, `social_user_profiles`, `social_audit_logs`.
+- Private Supabase Storage bucket: `post-files`, currently limited to 50 MB per object for Free-plan operation.
 - RLS policies are enabled for authenticated users. Workspace membership checks run through non-exposed `private` schema functions to prevent policy recursion.
 - Supabase Auth email/password and Google OAuth sign-in protect all app data.
 - `social_stores` is the canonical 23-store master: 22 stores from the MARUGO GROUP brands page plus `BLU NERO`.
@@ -23,6 +23,9 @@ The owner-only production deployment is:
 - Google OAuth signup keeps the selected store only as a temporary browser handoff until the callback completes. Existing users whose profile has no store see a one-time required store selection before the operations console loads.
 - Never use `user_metadata` for authorization. Canonical store scope comes from `social_user_profiles.store_id` and `social_workspaces.store_id`; RLS remains user/workspace based.
 - Posts, history, channels, and file metadata are stored in Postgres. File bytes are stored in private Storage.
+- Video crop settings support 1:1, 4:5, 9:16, and 16:9. The source is preserved, `social_media_jobs` records the asynchronous state, and processed MP4 files are added as separate `social_post_files` rows.
+- The `media-jobs` Edge Function dispatches Cloud Run Jobs. Without Google Cloud secrets it safely returns `configured: false` and leaves the job queued. Users can retry queued or failed jobs from history.
+- The FFmpeg worker is in `workers/media-processor/`. Its deployment and secret setup are documented in `workers/media-processor/README.md`.
 - SNS secrets are written only through the authenticated `integration-secrets` Edge Function. Browser clients never read stored secret values.
 - `/admin` is an administrator-only console for all users, stores, workspaces, posts, scheduled posts, files, integration status, and audit history. It provides both all-store and per-store views, a store operations summary, chronological reservation schedule, post status updates, short-lived file download URLs, and administrator grant/revoke controls.
 - Administrator access is stored by Auth user ID in `social_admin_users`. Never hardcode administrator emails or IDs in frontend source or migrations.
@@ -40,6 +43,7 @@ npm test
 npm run backup:dropbox
 supabase db push --linked
 supabase functions deploy integration-secrets --use-api
+supabase functions deploy media-jobs --use-api
 supabase db advisors --linked --type all --level warn --fail-on none
 ```
 
@@ -96,3 +100,5 @@ The migrations `20260726121622_add_social_admin_console.sql` and `20260726122528
 The migration `20260726124138_manage_social_administrators.sql` lets administrators manage administrator access from the `/admin` user directory while preserving the final administrator and auditing grant/revoke actions.
 
 The migration `20260726130739_add_social_store_affiliation.sql` creates the 23-store master, adds canonical `store_id` columns to profiles and workspaces, validates signup metadata, allows a user to set an initially empty profile store exactly once, and exposes only active store names to anonymous signup pages.
+
+The migrations `20260726135609_add_social_media_processing.sql` and `20260726141243_fix_media_job_rls_qualification.sql` add Free-plan media limits, original/processed file lineage, asynchronous crop jobs, strict same-workspace/source-file RLS, and service-role worker access.
