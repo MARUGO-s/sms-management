@@ -1367,6 +1367,16 @@ input:focus {
   margin: 0;
 }
 
+.storage-access {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.storage-access.authenticated {
+  color: var(--green);
+}
+
 .single-panel {
   background: var(--panel);
   border: 1px solid var(--line);

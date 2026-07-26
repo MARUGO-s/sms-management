@@ -1303,7 +1303,19 @@ export default function SocialConsole() {
                   </div>
                   <div>
                     <dt>アクセス</dt>
-                    <dd>ログイン必須</dd>
+                    <dd
+                      className={
+                        user
+                          ? "storage-access authenticated"
+                          : "storage-access"
+                      }
+                      aria-live="polite"
+                    >
+                      {user && (
+                        <CheckCircle2 aria-hidden="true" size={15} />
+                      )}
+                      <span>{user ? "認証済み" : "ログイン必須"}</span>
+                    </dd>
                   </div>
                 </dl>
               </div>
