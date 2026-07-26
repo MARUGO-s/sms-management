@@ -3,7 +3,7 @@
 ## 文書情報
 
 - 記録日時: 2026-07-26 21:50:36 JST
-- 最終更新日時: 2026-07-27 04:53 JST（2026-07-26 19:53 UTC）
+- 最終更新日時: 2026-07-26 20:17 UTC
 - 対象リポジトリ: `https://github.com/MARUGO-s/sms-management.git`
 - 対象ブランチ: `main`
 - 作業開始時HEAD: `cbf7d20c07b715c49a9bbc911343a1318fe72b0e`
@@ -1109,7 +1109,7 @@ supabase functions deploy media-jobs --use-api
 - Dropbox: ソースミラーとObsidian Vaultは別フォルダ。ソースミラーには`.env.local`と`.git`を含めない。VaultはDropbox同期完了後に別PCで同じフォルダをObsidian Vaultとして開く。
 - 次の作業: 別のアプリを追加する場合は`10_アプリ別/<アプリ名>/`を作り、そのアプリ固有のGraphify出力先を設定する。2台で同じノートを同時編集しない。
 
-### 2026-07-27 04:41 JST（2026-07-26 19:41 UTC）- Graphify・Obsidian・AI・Dockerを統合した開発知識環境を構築
+### 2026-07-26 19:41 UTC - Graphify・Obsidian・AI・Dockerを統合した開発知識環境を構築
 
 - 依頼: GraphifyとObsidianを十分に連携させ、アプリ開発に役立つシステム構成をまとめ、AI自身が両方を活用できる環境図を作る。利用可能になったDockerも必要箇所で使用する。
 - 設計: Graphifyを「現在コードの場所・関係・経路」、Obsidianを「設計意図・意思決定・運用・障害・機能知識」、Git作業コピーを「実装とテストの正本」、AIを「検索・構造探索・精読・実装・検証・書き戻しを循環させる主体」と定義した。会話コンテキストは永続記憶として扱わない。
@@ -1126,8 +1126,8 @@ supabase functions deploy media-jobs --use-api
 - 変更ファイル: `AGENTS.md`、`.graphifyignore`、`knowledge/system-architecture.json`、`docs/AI_CONTEXT.md`、`docs/AI_KNOWLEDGE_SYSTEM.md`、`scripts/generate-knowledge-system.mjs`、`scripts/check-knowledge-system.mjs`、`scripts/search-knowledge-vault.mjs`、`scripts/check-media-worker-docker.sh`、`scripts/update-knowledge-vault.sh`、`package.json`、管理画面/CSS、公開system-map生成物、テスト、README、AI handoff、進行記録。Obsidian側はDropbox同期対象でGit外。
 - DB・設定変更: Supabase DB migration、Edge Function本番、Cloud Run本番、Google Cloud IAM/Secret、SNS API設定の変更なし。既存Dockerコンテナの停止・再作成なし。
 - テスト: `npm run knowledge:update`成功、`npm run knowledge:check`成功、`npm run lint`はerror 0・既存warning 1、`npm test`は9件すべてpass、`npm run build:github-pages`成功、`npm run worker:docker:check`成功（linux/amd64 build、Node/FFmpeg/libx264/非root、crop-plan 2件、実9:16 MP4のH.264/AAC encode/probe）。`knowledge:search`で動画クロップ、管理者権限、Docker/Cloud Run知識が手書きノートから取得できることを確認。
-- Git: 統合実装commit `96acd595c8483e09d836a2e907fbd27e6519f8d9`と、同commitを基準にGraphify生成物を揃えるcommit `d0e49dc512436ec4cb1cbb784ffbce98ed66f5ce`を`main`へpush。
-- デプロイ: GitHub Actions `Deploy Instatic TalksX to GitHub Pages` run `30217679345`は成功。`/`、`/admin/`、`/system-map/environment.html`、`graph.html`、`graph-stats.json`、`knowledge-system-manifest.json`がすべてHTTP 200。公開環境図にGraphify × Obsidian × AI、Docker Desktop、326ノード、343関係、32コミュニティを確認。公開manifestにローカル`/Users/`パスが無いことを確認。OpenAI Sites、Supabase、Cloud Run本番は変更していない。
+- Git: 統合実装commit `96acd595c8483e09d836a2e907fbd27e6519f8d9`、Graphify生成物整合commit `d0e49dc512436ec4cb1cbb784ffbce98ed66f5ce`、公開記録commit `b538fb0b37675d97e62f4254bb99ebd96afb8a8c`、linux/amd64実MP4スモークテストcommit `45c8da6d1356f468809bf718ceba17af87ce41ad`、生成物整合commit `e51125c3e18d1f0b2f9937a973e02e91c989be04`を`main`へpush。
+- デプロイ: 最新のGitHub Actions `Deploy Instatic TalksX to GitHub Pages` run `30218468590`（HEAD `e51125c3e18d1f0b2f9937a973e02e91c989be04`）は成功。`/system-map/environment.html`と`graph-stats.json`はHTTP 200で、公開環境図に`linux/amd64`、実MP4変換、Graphify × Obsidian × AI、326ノード、343関係、32コミュニティを確認。公開manifestにローカル`/Users/`パスが無いことを確認。OpenAI Sites、Supabase、Cloud Run本番は変更していない。
 - Dropbox: commit後にGit管理ツリーを`instatic-talksx`ソースミラーへ同期し、`.git`と`.env*`を含めない。Obsidian Vaultは`アプリ知識`で独立同期し、同じノートを複数PCで同時編集しない。
 - 未完了事項: 認証済み本番`/admin`でシステムマップの2表示を切り替える最終操作確認。本番データに関する既存未完了（9分16秒動画の変換済みMP4再生確認、SNS実連携）は継続。
 - 次の作業: 次の開発依頼からこの知識フローを実運用する。別アプリをVaultへ追加する際は、アプリ固有の`70_AI作業環境/`、`90_Graphify/`、構成モデル、更新/検査/検索コマンドを同じ設計で用意する。
