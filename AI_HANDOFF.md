@@ -124,7 +124,7 @@ The service-account JSON was used to create the Supabase Edge Function secret an
 
 ## Reservation cancellation
 
-The reservation view now has a `キャンセル` button for each scheduled post. The action confirms with the user, updates only a still-`scheduled` row to `status=draft` and `scheduled_at=null`, and keeps the post body and attachments. The post disappears from the reservation queue and remains available in History as a draft. No migration or Edge Function change was needed; existing workspace RLS controls the update. `npm test` passed after this change. The change still needs a production Sites deployment and one real UI verification.
+The reservation view now has a `キャンセル` button for each scheduled post. The action confirms with the user, updates only a still-`scheduled` row to `status=draft` and `scheduled_at=null`, and keeps the post body and attachments. The post disappears from the reservation queue and remains available in History as a draft. No migration or Edge Function change was needed; existing workspace RLS controls the update. `npm test` passed after this change. The change is deployed to Sites production version 10 at `https://instatic-talksx.yoshito0428.chatgpt.site`. One real UI verification remains: while authenticated, cancel one scheduled post and confirm it disappears from the queue and appears as a draft in History. Unauthenticated HTTP checks return `401` because the site is owner-only.
 
 ## GitHub Pages entrypoint
 

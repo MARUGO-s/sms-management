@@ -1000,6 +1000,6 @@ supabase functions deploy media-jobs --use-api
 - 変更ファイル: `app/social-console.tsx`、`app/globals.css`、`PROJECT_PROGRESS.md`、`AI_HANDOFF.md`。
 - DB・設定変更: migrationなし。既存のworkspace member RLS付き`social_posts` UPDATEを使用し、対象状態を`scheduled`に限定。
 - テスト: `npm test`成功。既存7テスト全てpass。`git diff --check`成功。
-- デプロイ: Sites本番デプロイ待ち。Supabase DB・Edge Function変更なし。
-- 未完了事項: 本番画面で予約キャンセル操作をまだ実行していない。デプロイ後、予約投稿を1件選び、確認ダイアログ、予約一覧からの消失、履歴での下書き表示を確認する。
-- 次の作業: Sitesへ本番公開し、実画面で予約キャンセルを確認する。既存の動画Cloud Run資源や秘密値は触らない。
+- デプロイ: Sites本番バージョン10として公開完了（2026-07-27 01:03 JST）。本番URLは`https://instatic-talksx.yoshito0428.chatgpt.site`。Supabase DB・Edge Function変更なし。
+- 未完了事項: 認証済みブラウザ上で予約投稿を1件キャンセルし、予約一覧からの消失と履歴での下書き表示を実操作確認すること。未認証のHTTP確認は所有者限定公開のため`401`となる。
+- 次の作業: 認証済み本番画面で予約投稿を1件選び、確認ダイアログ、予約一覧からの消失、履歴での下書き表示を確認する。既存の動画Cloud Run資源や秘密値は触らない。
