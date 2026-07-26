@@ -3,10 +3,10 @@
 ## 文書情報
 
 - 記録日時: 2026-07-26 21:50:36 JST
-- 最終更新日時: 2026-07-26 23:26 JST
+- 最終更新日時: 2026-07-27 00:25 JST
 - 対象リポジトリ: `https://github.com/MARUGO-s/sms-management.git`
 - 対象ブランチ: `main`
-- 今回の作業開始時HEAD: `776feed5ca0b22e0d34d8ad307884faf87b2b124`
+- 現在のHEAD: `bb23a9a221221b53fa7394b72ed22c9a0dcabfa1`
 - ローカル作業場所: `/Users/yoshito/Documents/New project`
 - 本番URL: `https://instatic-talksx.yoshito0428.chatgpt.site`
 - 管理者URL: `https://instatic-talksx.yoshito0428.chatgpt.site/admin`
@@ -76,7 +76,29 @@ Instatic TalksXは、Instagram、TikTok、X、Threadsの運用情報を一括管
 - 管理者権限変更を含む監査ログ
 - GitHub、Dropbox、Sitesへの引き継ぎ経路
 
-現時点では実際のSNS公開処理、コメント・DM同期、Webhook受信、各SNSの分析値取得は未実装。各SNSの開発者アプリ審査、OAuth認可、公開API実装が別途必要。動画クロップの画面、キュー、Edge Function、FFmpegワーカーは実装済みだが、Cloud Run実行環境はGCPプロジェクト未選定のため未接続。接続前のジョブは`queued`としてSupabaseへ残る。
+現時点では実際のSNS公開処理、コメント・DM同期、Webhook受信、各SNSの分析値取得は未実装。各SNSの開発者アプリ審査、OAuth認可、公開API実装が別途必要。動画クロップの画面、キュー、Edge Function、FFmpegワーカーは実装済みで、Cloud Run実行環境も構築済み。2026-07-27 00:19 JST時点で9分16秒動画のジョブがアプリ上で処理中表示になっており、処理済みMP4への変換完了はまだ確認できていない。
+
+### Cloud Run動画処理の実環境
+
+- Google Cloud project: `instatic-talksx-media`
+- Region: `asia-northeast1`（東京）
+- Artifact Registry: `instatic-talksx`
+- Worker image: `asia-northeast1-docker.pkg.dev/instatic-talksx-media/instatic-talksx/media-processor:latest`
+- Cloud Run Job: `instatic-media-processor`
+- Job設定: 1 task、parallelism 1、max retries 1、timeout 15分、2 vCPU、2GiB、runtime service account `instatic-media-runtime`
+- Secret Manager secret名: `instatic-supabase-url`、`instatic-supabase-secret-key`
+- Dispatcher service account: `instatic-media-dispatcher`
+- Dispatcher権限: `roles/run.jobsExecutorWithOverrides`
+- Supabase Edge Function Secrets: `GOOGLE_SERVICE_ACCOUNT_JSON`、`GOOGLE_CLOUD_PROJECT_ID`、`GOOGLE_CLOUD_REGION`、`GOOGLE_CLOUD_RUN_JOB_NAME`
+- 秘密値そのもの、サービスアカウントJSON、Supabase Secret keyはこの記録・Git・Dropboxソースミラーへ記載しない。
+
+### 直近の動画処理確認
+
+- アプリの予約一覧でテスト投稿1件を確認済み。
+- 9分16秒動画をクロップ保存し、アプリ上で処理中表示を確認済み。
+- 予約一覧は処理済み動画のプレビュー画面ではない。確認は`履歴`の投稿詳細から、`変換済み`と表示されたMP4をダウンロードして行う。
+- 2026-07-27 00:25 JST時点では`変換済み`とダウンロード再生まで未確認。
+- 15分を超えて処理中のままなら、Cloud Run JobのExecutionログとSupabaseの`social_media_jobs`のstatus/error_messageを確認する。手動でJobを実行しない。手動実行には対象ジョブID等の入力が必要で、アプリのDispatcher経由の実行と異なる。
 
 ## 本番データのスナップショット
 
@@ -773,14 +795,12 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
 
 ## 次に着手する優先順位
 
-### 優先度1: Cloud Run動画処理の接続
+### 優先度1: Cloud Run動画処理の完了確認
 
-1. 所有者が使用するGCPプロジェクトを指定
-2. 課金アカウントと必要APIを有効化
-3. Artifact Registryへworker imageをbuild/push
-4. Supabase URLとserver-only keyをGoogle Secret Managerへ保存
-5. Dispatcher用service account JSONをSupabase Secretsへ保存
-6. 実動画1件で元動画保持、処理済みMP4、履歴状態を確認
+1. アプリの履歴を更新し、対象ジョブが`変換済み`になるか確認
+2. `変換済み`のMP4をダウンロードして、クロップ比率と動画時間を確認
+3. 15分超または`失敗`なら、Cloud Run Job Executionログと`social_media_jobs.error_message`を確認
+4. 必要に応じて既存Jobの設定を修正する。既存のGCP資源、Secret、サービスアカウントを再作成しない
 
 具体的なコマンドと秘密情報の配置先は`workers/media-processor/README.md`を参照。
 
@@ -947,3 +967,18 @@ supabase functions deploy media-jobs --use-api
 - Dropbox: `.env*`を除外してソースミラーへ同期し、`PROJECT_PROGRESS.md`の一致と秘密ファイル除外を確認する。
 - 未完了事項: Cloud Run Job自体はGCPプロジェクト未選定、`gcloud`未導入、Docker未起動、server-only key未配置のため未デプロイ。接続前のジョブは`queued`で保持される。
 - 次の作業: 使用するGCPプロジェクトを所有者が指定後、`workers/media-processor/README.md`に従ってCloud Runを接続し、50MB未満の実動画1件で処理完了を確認する。
+
+### 2026-07-27 00:25 JST - Cloud Run動画処理環境の構築とAI引き継ぎ更新
+
+- 依頼: 使用量枠が近いため、次のAIが現在状態を問題なく引き継げるよう、実装・本番・Cloud Run設定・未完了事項を記録する。
+- 実施内容: Google Cloud project `instatic-talksx-media`を使用。必要APIを有効化し、Artifact Registry、FFmpeg worker image、runtime service account、Secret Manager secrets、Cloud Run Job、Dispatcher service accountと実行権限を作成。Supabase Edge Function SecretsへCloud Run接続設定を保存。
+- 実行済みコマンドの要約: `gcloud services enable`、`gcloud artifacts repositories create`、`gcloud builds submit`、service account作成、Secret Manager登録・IAM付与、`gcloud run jobs create`、Dispatcher IAM付与、service account JSON作成・ダウンロード・Cloud Shell側削除。
+- 変更ファイル: `PROJECT_PROGRESS.md`。アプリコードの変更なし。
+- DB・設定変更: Supabase DB migrationの追加なし。既存の`media-jobs` Edge Functionと既存Secretsを利用。Cloud Run JobとGoogle Cloud IAM/Secret Manager設定を追加。
+- セキュリティ: Supabase Secret keyとGoogle service account JSONはチャット、スクリーンショット、Git、Dropboxソースミラーへ記録していない。ダウンロードしたJSONのCloud Shell側ファイルは削除済み。Macのダウンロードフォルダ側の一時JSONは利用者が削除する運用として案内済みで、次のAIは再取得しない。
+- テスト結果: Artifact Registry buildは`STATUS: SUCCESS`。Cloud Run Job作成成功。アプリで9分16秒動画をクロップ保存し、処理中表示まで確認。変換済みMP4のダウンロード・再生、Cloud Run Execution成功、動画時間の確認は未完了。
+- デプロイ先: 本番Sitesは既存v9のまま。Supabase `media-jobs` Edge Functionは既存本番版を使用。Cloud Run Jobは`instatic-media-processor`。
+- Git: 作業開始時HEADは`bb23a9a221221b53fa7394b72ed22c9a0dcabfa1`。この記録更新を新しいcommitとして`main`へ保存・pushする。
+- Dropbox: Gitソースミラーを更新し、`PROJECT_PROGRESS.md`をGit作業場所と一致させる。`.env*`と秘密JSONは同期しない。
+- 未完了事項: 9分16秒動画が15分以内に`変換済み`へ遷移するか未確認。遷移しない場合は既存Cloud Run Executionログ、Supabase job status、workerのエラーを調査する。SNS API連携・実投稿公開は未実装。
+- 次のAIへの最初の作業: `PROJECT_PROGRESS.md`と`AI_HANDOFF.md`を全文確認し、`git status`を確認。既存資源を再作成せず、まずアプリ履歴を更新して変換済みMP4を確認する。秘密値は表示・取得・再発行しない。

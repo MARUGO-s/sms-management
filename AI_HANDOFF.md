@@ -102,3 +102,22 @@ The migration `20260726124138_manage_social_administrators.sql` lets administrat
 The migration `20260726130739_add_social_store_affiliation.sql` creates the 23-store master, adds canonical `store_id` columns to profiles and workspaces, validates signup metadata, allows a user to set an initially empty profile store exactly once, and exposes only active store names to anonymous signup pages.
 
 The migrations `20260726135609_add_social_media_processing.sql` and `20260726141243_fix_media_job_rls_qualification.sql` add Free-plan media limits, original/processed file lineage, asynchronous crop jobs, strict same-workspace/source-file RLS, and service-role worker access.
+
+## 2026-07-27 Cloud Run status
+
+Cloud Run media processing has now been configured. Do not repeat the setup blindly.
+
+- Google Cloud project: `instatic-talksx-media`
+- Region: `asia-northeast1`
+- Artifact Registry repository: `instatic-talksx`
+- Worker image: `asia-northeast1-docker.pkg.dev/instatic-talksx-media/instatic-talksx/media-processor:latest`
+- Cloud Run Job: `instatic-media-processor`
+- Job resources: 1 task, parallelism 1, max retries 1, 15 minute timeout, 2 vCPU, 2GiB memory
+- Runtime service account: `instatic-media-runtime`
+- Dispatcher service account: `instatic-media-dispatcher`, granted `roles/run.jobsExecutorWithOverrides`
+- Google Secret Manager secret names: `instatic-supabase-url`, `instatic-supabase-secret-key`
+- Supabase Edge Function secret names: `GOOGLE_SERVICE_ACCOUNT_JSON`, `GOOGLE_CLOUD_PROJECT_ID`, `GOOGLE_CLOUD_REGION`, `GOOGLE_CLOUD_RUN_JOB_NAME`
+
+The worker image build reported `STATUS: SUCCESS`, and the Cloud Run Job was created successfully. A 9 minute 16 second video was saved through the production app and was still shown as processing at the latest check. The next agent must first refresh the app History view and verify whether the file becomes `変換済み`; then download the processed MP4 and compare crop and duration. If it remains processing for more than 15 minutes or becomes failed, inspect the existing Cloud Run Job Execution logs and the Supabase `social_media_jobs` status/error fields. Do not manually execute the Job without the application payload, and do not recreate existing Cloud Run resources or secrets.
+
+The service-account JSON was used to create the Supabase Edge Function secret and then removed from Cloud Shell. The local downloaded copy should be removed from the Mac Downloads folder. Never place the JSON, Supabase secret key, Google key, SNS secrets, or any secret values in Git, this file, `PROJECT_PROGRESS.md`, Dropbox source mirror, chat, or screenshots.
