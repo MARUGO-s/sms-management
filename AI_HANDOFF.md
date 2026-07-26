@@ -40,10 +40,13 @@ supabase db advisors --linked --type all --level warn --fail-on none
 
 ## Environment and security
 
-- `.env.local` is intentionally excluded from Git and from Dropbox handoff copies.
+- `.env.local` is intentionally excluded from Git and the Dropbox source mirror.
+- The Dropbox-only runtime handoff is `/Users/yoshito/Library/CloudStorage/Dropbox/web/instatic-talksx-secrets/.env.local`.
+- Keep future server keys in the same Dropbox-only folder, never inside the Git source mirror.
 - Client variables: `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 - The Dropbox backup requires server-only `SUPABASE_SECRET_KEY` and `DROPBOX_BACKUP_DIR`.
-- Never put `SUPABASE_SECRET_KEY`, `service_role`, SNS Client Secrets, or SNS access tokens in Git, browser storage, or this handoff file.
+- Secrets may be stored in the dedicated Dropbox secrets folder for AI handoff, as approved by the owner.
+- Never put `SUPABASE_SECRET_KEY`, `service_role`, SNS Client Secrets, or SNS access tokens in Git, the source mirror, browser storage, chat messages, screenshots, or this handoff file.
 
 ## Product boundary
 
@@ -56,7 +59,7 @@ Email confirmation and Google OAuth are enabled. Supabase Dashboard > Authentica
 - Site URL: `https://instatic-talksx.yoshito0428.chatgpt.site`
 - Redirect URLs: `https://instatic-talksx.yoshito0428.chatgpt.site/**` and `http://localhost:3000/**`
 
-Google OAuth credentials are stored only in Supabase and Google Auth Platform. Never add the Google Client Secret to Git, Dropbox, screenshots, or this handoff file.
+Google OAuth credentials remain stored in Supabase and Google Auth Platform because the current secret cannot be exported from the local project. Never add the Google Client Secret to Git, the source mirror, chat messages, screenshots, or this handoff file.
 
 Google OAuth was verified by confirming that the Supabase authorize endpoint redirects to `accounts.google.com`.
 
@@ -64,11 +67,13 @@ Supabase Advisors currently reports one Auth warning: leaked-password protection
 
 ## Dropbox backup
 
-Supabase is the production source of truth. Dropbox is a local backup destination only. The backup script writes table JSON and files under:
+Supabase is the production source of truth. Dropbox is the approved local backup and secret handoff destination. The backup script writes table JSON and files under:
 
 `/Users/yoshito/Library/CloudStorage/Dropbox/web/instatic-talksx-backups/`
 
 The app cannot write to a Mac filesystem directly when deployed to the cloud. Run the backup script on the Mac, or add a separate scheduled runner.
+
+Backups include `social_integration_secrets` and must therefore be treated as sensitive. Keep them within the owner's Dropbox account and do not attach them to GitHub issues, chats, or screenshots.
 
 ## GitHub
 

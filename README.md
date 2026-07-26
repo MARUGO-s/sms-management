@@ -47,4 +47,4 @@ supabase db advisors --linked --type all --level warn --fail-on none
 
 ## Backup
 
-`npm run backup:dropbox` は、管理者用のserver-only keyを使ってSupabaseのテーブルとファイルをDropboxへバックアップします。Supabaseが本番データの正本で、DropboxはバックアップとAI引き継ぎ用です。
+`npm run backup:dropbox` は、管理者用のserver-only keyを使ってSupabaseのテーブル、SNS連携シークレット、ファイルをDropboxへバックアップします。Supabaseが本番データの正本で、Dropboxは所有者専用のバックアップとAI引き継ぎ用です。秘密情報はGitのソースフォルダと分離してください。
