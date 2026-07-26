@@ -773,7 +773,7 @@ supabase functions deploy integration-secrets --use-api
 - DB・設定変更: なし。
 - 検証: Markdown内容、秘密情報の混入、Git差分を確認。
 - デプロイ: アプリ本体の変更がないためSitesデプロイなし。
-- Git: 作業開始時HEADは`62fc116`。この記録を含む次のcommitで更新予定。
-- Dropbox: Git commit後にソースミラーへ同期し、内容一致を確認する。
+- Git: commit `356f127`を`main`へpush。
+- Dropbox: ソースミラーへ同期し、内容一致と`.env*`除外を確認。
 - 未完了事項: なし。
 - 次の作業: 次回のAIは作業前にこの文書を読み、作業後にこのログ末尾へ記録を追加する。
