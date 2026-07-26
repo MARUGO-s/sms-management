@@ -4,6 +4,9 @@
 
 Instatic TalksX is a Japanese social operations console for Instagram, TikTok, X, and Threads.
 The local app runs at `http://localhost:3000/` from the repository root.
+The owner-only production deployment is:
+
+`https://instatic-talksx.yoshito0428.chatgpt.site`
 
 ## Current state
 
@@ -42,6 +45,15 @@ supabase db advisors --linked --type all --level warn --fail-on none
 ## Product boundary
 
 The current production app safely stores users, reservations, history, files, and SNS credentials. Actual publishing, inbox sync, webhooks, and platform analytics still require approved developer apps and provider-specific OAuth/publishing implementations for Instagram, TikTok, X, and Threads. The UI deliberately labels those areas as pending instead of showing mock production data.
+
+## Required Supabase admin setting
+
+Email confirmation is enabled. Before inviting production users, an owner must open Supabase Dashboard > Authentication > URL Configuration and set:
+
+- Site URL: `https://instatic-talksx.yoshito0428.chatgpt.site`
+- Redirect URLs: `https://instatic-talksx.yoshito0428.chatgpt.site/**` and `http://localhost:3000/**`
+
+The currently authenticated Supabase CLI account can deploy migrations and functions but receives `403` for the Auth configuration Management API. Do not work around this with database changes; complete it with a Supabase project owner account.
 
 ## Dropbox backup
 
