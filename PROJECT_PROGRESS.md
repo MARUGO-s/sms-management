@@ -1045,6 +1045,6 @@ supabase functions deploy media-jobs --use-api
 - 変更ファイル: `public/system-map/graph.html`、`public/system-map/GRAPH_REPORT.md`、`PROJECT_PROGRESS.md`。
 - DB・設定変更: Supabase migration、Edge Function、Cloud Run、Google Cloud、SNS API設定の変更なし。
 - テスト: `npm test`成功。7件すべてpassし、ビルドも成功。
-- デプロイ: 本作業のcommitを`main`へpushするとGitHub ActionsがGitHub Pagesへ自動公開する。OpenAI Sitesはこの作業では変更しない。
+- デプロイ: commit `981c7ac04a45e08598eb4dc8a3ab3e9aaecb3177`を`main`へpush。GitHub Actions `Deploy Instatic TalksX to GitHub Pages`（run `30214762150`）は成功。公開中の`/system-map/GRAPH_REPORT.md`と`graph.html`はいずれもHTTP 200で、264ノード、282関係の最新版を確認した。OpenAI Sitesはこの作業では変更していない。
 - Dropbox: commit後にGit管理ツリーを`/Users/yoshito/Library/CloudStorage/Dropbox/web/instatic-talksx/`へ同期し、`.env.local`と`.git`を含めない。
 - 次の作業: GitHub ActionsのPagesデプロイ成功後、`/sms-management/admin/`でシステムマップが264ノード、282関係の最新版として開くことを確認する。管理者権限フローをGraphifyで横断探索したい場合は、SQL migrationを安全に含める抽出設計を別途追加する。
