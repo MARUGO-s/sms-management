@@ -1025,3 +1025,12 @@ supabase functions deploy media-jobs --use-api
 - デプロイ: Sites v12、source commit `93f90337cfafe1b48228117b426815ab9a70a3f4`、本番URL `https://instatic-talksx.yoshito0428.chatgpt.site`。
 - DB・設定変更: Sitesのアクセス設定以外に、Supabase migration、Edge Function、Cloud Run、Google Cloud、SNS APIの変更なし。
 - 次の作業: ブラウザで`https://marugo-s.github.io/sms-management/`を再読み込みし、ChatGPT認証画面なしでアプリのSupabaseログイン画面が開くことを確認する。GitHub Pagesをアプリ実行環境としては扱わない。
+
+### 2026-07-27 02:20 JST - GitHub Pagesをアプリ本体の本番URLへ切替
+
+- 依頼: GitHub URLから転送ではなく、`https://marugo-s.github.io/sms-management/`そのものをアプリの本番URLとして利用したい。
+- 実施内容: Vinextの静的exportを追加し、GitHub Actionsで`main`更新時に`dist/client`をGitHub Pagesへ公開する`.github/workflows/deploy-github-pages.yml`を追加。GitHub Pagesのbuild typeを`workflow`へ切替済み。プロジェクトPages配下の`/sms-management/`に合わせ、生成物のアセット・メタデータURLを`scripts/prepare-github-pages.mjs`で正規化し、画面内の管理リンク・Graphifyマップ・Supabase Authの戻り先を`app/lib/public-path.ts`経由で同じパスへ揃えた。
+- GitHub設定: Actions Secret `NEXT_PUBLIC_SUPABASE_URL`と`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`を登録済み。値はGit、作業ログ、Dropboxソースミラー、文書へ記録していない。Secret/service role key/SNS秘密情報は追加していない。
+- テスト: `npm run build:github-pages`が`/`と`/admin`を静的生成し、`dist/client/index.html`と`dist/client/admin/index.html`を確認。静的HTML/RSC内のアセット参照が`/sms-management/`配下になることを検査。`npm test`は7件すべて成功、`git diff --check`成功。
+- 必須の手動設定: Supabase Dashboard > Authentication > URL ConfigurationのRedirect URLsに`https://marugo-s.github.io/sms-management/**`を追加する。追加前はGitHub Pages上のメール確認、パスワード再設定、Google OAuthの戻り先が拒否されるため、本番ログイン確認を行わない。
+- 次の作業: 本commitを`main`へpushし、GitHub ActionsのPagesデプロイ成功を確認。次にGitHub Pages URLをブラウザで開き、ログイン画面、`/admin/`、システムマップのアセット読み込みを確認する。SupabaseのRedirect URL追加後にメール認証またはGoogle OAuthを1回実操作で確認する。

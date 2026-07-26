@@ -2,7 +2,6 @@
 
 import { Button } from "@heroui/react";
 import type { User } from "@supabase/supabase-js";
-import Link from "next/link";
 import {
   Activity,
   ArrowLeft,
@@ -25,6 +24,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { appPath } from "../lib/public-path";
 
 type AdminView =
   | "posts"
@@ -708,10 +708,10 @@ export default function AdminConsole() {
               ? "このアカウントには管理者権限がありません。"
               : "管理者アカウントでログインしてください。"}
           </p>
-          <Link className="admin-back-link" href="/">
+          <a className="admin-back-link" href={appPath("/")}>
             <ArrowLeft aria-hidden="true" size={17} />
             <span>通常画面へ戻る</span>
-          </Link>
+          </a>
         </section>
       </main>
     );
@@ -754,10 +754,10 @@ export default function AdminConsole() {
           })}
         </nav>
 
-        <Link className="admin-rail-back" href="/">
+        <a className="admin-rail-back" href={appPath("/")}>
           <ArrowLeft aria-hidden="true" size={17} />
           <span>通常画面</span>
-        </Link>
+        </a>
       </aside>
 
       <section className="admin-main">
@@ -1214,7 +1214,7 @@ export default function AdminConsole() {
               </div>
               <a
                 className="admin-system-map-link"
-                href="/system-map/graph.html"
+                href={appPath("/system-map/graph.html")}
                 rel="noreferrer"
                 target="_blank"
               >
@@ -1229,7 +1229,7 @@ export default function AdminConsole() {
             </div>
             <iframe
               className="admin-system-map-frame"
-              src="/system-map/graph.html"
+              src={appPath("/system-map/graph.html")}
               title="Instatic TalksX システムマップ"
             />
           </section>

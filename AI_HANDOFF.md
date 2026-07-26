@@ -4,7 +4,11 @@
 
 Instatic TalksX is a Japanese social operations console for Instagram, TikTok, X, and Threads.
 The local app runs at `http://localhost:3000/` from the repository root.
-The owner-only production deployment is:
+The GitHub Pages production deployment is:
+
+`https://marugo-s.github.io/sms-management/`
+
+The legacy OpenAI Sites deployment remains available as a secondary preview only:
 
 `https://instatic-talksx.yoshito0428.chatgpt.site`
 
@@ -32,6 +36,7 @@ The owner-only production deployment is:
 - Administrator changes require an existing registered user, are limited by RLS to current administrators, and are written to the audit log. The UI prevents self-revocation and the database prevents removal of the final administrator.
 - `social_audit_logs` records safe operation metadata only. It deliberately excludes post bodies and all rows from `social_integration_secrets`.
 - The Sites deployment project is recorded in `.openai/hosting.json`. Production variables are managed in Sites, not committed files.
+- GitHub Pages is deployed by `.github/workflows/deploy-github-pages.yml`. It builds a static artifact with `npm run build:github-pages`; the workflow reads only the two public Supabase client settings from GitHub Actions Secrets.
 - Dropbox backup script: `scripts/backup-supabase-to-dropbox.mjs`.
 
 ## Important commands
@@ -63,10 +68,12 @@ The current production app safely stores users, reservations, history, files, an
 
 ## Supabase Auth settings
 
-Email confirmation and Google OAuth are enabled. Supabase Dashboard > Authentication > URL Configuration is configured with:
+Email confirmation and Google OAuth are enabled. Supabase Dashboard > Authentication > URL Configuration must allow both deployments:
 
-- Site URL: `https://instatic-talksx.yoshito0428.chatgpt.site`
-- Redirect URLs: `https://instatic-talksx.yoshito0428.chatgpt.site/**` and `http://localhost:3000/**`
+- Site URL: `https://marugo-s.github.io/sms-management/`
+- Redirect URLs: `https://marugo-s.github.io/sms-management/**`, `https://instatic-talksx.yoshito0428.chatgpt.site/**`, and `http://localhost:3000/**`
+
+Before testing email confirmation, password reset, or Google OAuth on GitHub Pages, verify that the GitHub Pages wildcard redirect entry above has actually been added in the Supabase dashboard. It cannot be stored in source code or GitHub Actions.
 
 Google OAuth credentials remain stored in Supabase and Google Auth Platform because the current secret cannot be exported from the local project. Never add the Google Client Secret to Git, the source mirror, chat messages, screenshots, or this handoff file.
 
@@ -128,7 +135,11 @@ The reservation view now has a `キャンセル` button for each scheduled post.
 
 ## GitHub Pages entrypoint
 
-GitHub Pages previously showed the repository README because the repository is not a static export of the Vinext application. The actual application remains deployed at `https://instatic-talksx.yoshito0428.chatgpt.site`. A root `index.html` was added to redirect GitHub Pages visitors to that production URL. After the commit is pushed, verify `https://marugo-s.github.io/sms-management/` after the Pages deployment finishes. Do not move Supabase keys or the server application into GitHub Pages; the redirect file contains no secrets.
+GitHub Pages is the primary production deployment at `https://marugo-s.github.io/sms-management/`. The repository uses GitHub Actions rather than legacy branch publishing. `.github/workflows/deploy-github-pages.yml` builds `dist/client` with `npm run build:github-pages` and uploads it as the Pages artifact. The static build keeps all user data, authentication, files, and media requests in Supabase/Cloud Run; it never contains a secret key.
+
+Because a project Pages site is served beneath `/sms-management/`, `scripts/prepare-github-pages.mjs` rewrites generated asset and metadata paths after Vinext's static export. `app/lib/public-path.ts` handles in-app links and Supabase redirect targets. Do not remove either file unless the Pages hosting path changes. Keep `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` only as GitHub Actions Secrets; do not add any Supabase secret/service key or SNS secret to this workflow.
+
+Supabase Dashboard > Authentication > URL Configuration must include `https://marugo-s.github.io/sms-management/**` in Redirect URLs before Google OAuth, email confirmation, or password reset can return to the GitHub Pages application.
 
 ## Graphify system map
 

@@ -2,7 +2,6 @@
 
 import { Button } from "@heroui/react";
 import type { User } from "@supabase/supabase-js";
-import Link from "next/link";
 import {
   AlertCircle,
   BarChart3,
@@ -47,6 +46,7 @@ import {
   type FormEvent,
 } from "react";
 import { supabase } from "./lib/supabase";
+import { appPath } from "./lib/public-path";
 import MediaEditor, {
   defaultMediaCrop,
   type MediaCropConfig,
@@ -117,6 +117,14 @@ type MediaJobRow = {
   crop_config: MediaCropConfig;
   error_message: string;
 };
+
+function getAuthRedirectUrl() {
+  const basePath = process.env.NEXT_PUBLIC_APP_BASE_PATH ?? "";
+  const normalizedPath = basePath
+    ? `/${basePath.replace(/^\/+|\/+$/g, "")}/`
+    : "/";
+  return new URL(normalizedPath, window.location.origin).toString();
+}
 
 type HistoryRecord = {
   id: string;
@@ -766,7 +774,7 @@ export default function SocialConsole() {
             email,
             password,
             options: {
-              emailRedirectTo: window.location.origin,
+              emailRedirectTo: getAuthRedirectUrl(),
               data: { social_store_id: selectedStoreId },
             },
           });
@@ -800,7 +808,7 @@ export default function SocialConsole() {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: getAuthRedirectUrl(),
         skipBrowserRedirect: true,
       },
     });
@@ -865,7 +873,7 @@ export default function SocialConsole() {
       return;
     }
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
+      redirectTo: getAuthRedirectUrl(),
     });
     setAuthMessage(
       error
@@ -1551,10 +1559,10 @@ export default function SocialConsole() {
             );
           })}
           {isAdmin && (
-            <Link className="view-tab admin-nav-link" href="/admin">
+            <a className="view-tab admin-nav-link" href={appPath("/admin/")}>
               <ShieldCheck aria-hidden="true" size={18} />
               <span>管理者</span>
-            </Link>
+            </a>
           )}
         </nav>
 

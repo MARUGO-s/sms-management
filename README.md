@@ -43,6 +43,18 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key
 
 秘密キー、service role key、SNSトークンをGitへ保存しないでください。
 
+## GitHub Pages deployment
+
+本番URLは [https://marugo-s.github.io/sms-management/](https://marugo-s.github.io/sms-management/) です。`main`へpushするとGitHub Actionsが静的アプリをビルドしてGitHub Pagesへ公開します。Actionsには`NEXT_PUBLIC_SUPABASE_URL`と`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`をRepository Secretとして登録します。これらはブラウザ向けの公開キーであり、秘密キー・service role key・SNSトークンを登録してはいけません。
+
+Supabase DashboardのAuthentication > URL Configurationでは、Redirect URLsに次を登録します。
+
+```text
+https://marugo-s.github.io/sms-management/**
+```
+
+これによりメール確認、パスワード再設定、Google OAuthの完了後にGitHub Pagesのアプリへ戻ります。
+
 ## System map
 
 `/admin` の「システムマップ」は、Graphifyで生成したアプリのコード構成図です。利用者の投稿本文、添付ファイル、Supabaseデータ、環境変数、SNS連携シークレットは解析・表示しません。
