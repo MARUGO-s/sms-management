@@ -30,10 +30,8 @@ test("server-renders the Instatic TalksX operations console", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>Instatic TalksX<\/title>/i);
-  assert.match(html, /投稿を作成/);
-  assert.match(html, /履歴/);
-  assert.match(html, /ファイルを添付/);
-  assert.match(html, /連携/);
+  assert.match(html, /ログイン/);
+  assert.match(html, /業務データはアカウントごとに保護されます/);
   assert.doesNotMatch(html, /Your site is taking shape|react-loading-skeleton/i);
 });
 
