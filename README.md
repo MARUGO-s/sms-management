@@ -67,6 +67,34 @@ npm run graphify:system-map
 
 このコマンドはローカルの`graphify-out/`に作業用出力を生成し、公開用の`public/system-map/graph.html`だけを更新します。`graphify-out/`はGit・Dropboxソースミラーに保存しません。
 
+## Obsidian knowledge vault
+
+プロジェクト知識は、Dropbox上のObsidian Vault「アプリ知識」にアプリごとに分けて保存します。
+
+```text
+アプリ知識/
+├── 00_総合/
+├── 10_アプリ別/
+│   └── Instatic TalksX/
+│       ├── 00_HOME.md
+│       ├── 10_プロジェクト概要/
+│       ├── 20_設計/
+│       ├── 30_運用手順/
+│       ├── 40_意思決定/
+│       ├── 50_障害と対応/
+│       ├── 60_機能別知識/
+│       └── 90_Graphify/
+└── 90_共通知識/
+```
+
+コード構成を変更した後は、次の1コマンドで管理画面用システムマップとObsidianのGraphifyノートを更新します。
+
+```bash
+npm run knowledge:update
+```
+
+別PCでVaultの場所が異なる場合は、`KNOWLEDGE_VAULT_GRAPHIFY_DIR`にそのPCの`90_Graphify`フォルダを指定します。`90_Graphify/`は自動生成領域なので手編集しません。Vaultへ`.env`、秘密鍵、service role key、SNSトークン、本番個人データ、投稿本文、添付ファイルを保存しないでください。
+
 ## Supabase
 
 ```bash

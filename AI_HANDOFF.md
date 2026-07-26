@@ -143,7 +143,7 @@ Supabase Dashboard > Authentication > URL Configuration must include `https://ma
 
 ## Graphify system map
 
-The administrator console includes a `システムマップ` view backed by the static asset `public/system-map/graph.html`. It is a Graphify code-only architecture map, not a graph of production SNS posts, files, users, Supabase rows, or secrets. The current graph was generated with `graphify extract . --code-only --out .` and has 254 nodes, 269 relationships, and 25 communities. Its diagnostics reported no missing or dangling edges.
+The administrator console includes a `システムマップ` view backed by the static asset `public/system-map/graph.html`. It is a Graphify code-only architecture map, not a graph of production SNS posts, files, users, Supabase rows, or secrets. The current graph was generated with `graphify extract . --code-only --out .` and has 267 nodes, 284 relationships, and 27 communities.
 
 To refresh it after intentional code structure changes, run `npm run graphify:system-map` on a development machine where the Graphify CLI is installed. The script regenerates `graphify-out/` locally, then copies the reviewed `graph.html` and `GRAPH_REPORT.md` into `public/system-map/`. `graphify-out/` is deliberately ignored by Git and must not be added to the Dropbox source mirror. Keep this code-only boundary; do not add environment files, runtime secrets, user uploads, post content, or database exports to Graphify input without an explicit security design review.
 
@@ -162,6 +162,18 @@ This is an absolute operating rule for every AI and developer working on this re
 - After intentional code-structure changes, run `npm run graphify:system-map` before review and deployment. Do not investigate or report from a stale graph.
 - If `graphify update .` fails with a sandbox watcher permission error, use `npm run graphify:system-map`, which performs the safe code-only extract and clustering flow.
 - Keep Graphify code-only. Never add environment files, secrets, user posts, uploaded files, production database exports, or SNS credentials to its input.
+
+## Obsidian knowledge vault
+
+Durable project knowledge is kept in an Obsidian vault stored in Dropbox and synced across desktop PCs. It is external memory: read the relevant notes to reconstruct context, and write findings back after work.
+
+- Vault root: `/Users/yoshito/Library/CloudStorage/Dropbox/web/アプリ知識`
+- Per-app layout: `10_アプリ別/<app>/` (this app: `10_アプリ別/Instatic TalksX/`), with `00_HOME.md` and numbered folders for overview, design, operations, decisions, incidents, and feature knowledge.
+- `90_Graphify/` inside each app folder is auto-generated Obsidian notes plus `graph.canvas`. Do not edit it by hand.
+- Update from the working directory with `npm run knowledge:update` (`scripts/update-knowledge-vault.sh`): it refreshes the admin system map and regenerates the vault's `90_Graphify/` notes, then scans the output for secret markers.
+- Override the output folder with `KNOWLEDGE_VAULT_GRAPHIFY_DIR` if the vault path differs on another machine.
+- Vault is code-and-docs knowledge only: never store `.env`, secret keys, service role keys, SNS tokens, production personal data, post bodies, or uploaded files in it.
+- Dropbox syncs the vault between desktop PCs. Do not edit the same note on two machines at once; let sync finish first. Mobile sync via Dropbox is unreliable; use Obsidian Sync if mobile is needed.
 
 ## Production site access
 

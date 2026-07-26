@@ -3,7 +3,7 @@
 ## 文書情報
 
 - 記録日時: 2026-07-26 21:50:36 JST
-- 最終更新日時: 2026-07-26 03:39 JST
+- 最終更新日時: 2026-07-26 04:00 JST
 - 対象リポジトリ: `https://github.com/MARUGO-s/sms-management.git`
 - 対象ブランチ: `main`
 - 作業開始時HEAD: `254ae115195425d8672983eb765240713aaebf4f`
@@ -1077,3 +1077,17 @@ supabase functions deploy media-jobs --use-api
 - デプロイ: 本commitを`main`へpushし、GitHub Actionsが実行される（アプリ挙動への影響はドキュメントのみのため無し）。OpenAI Sitesは変更しない。
 - Dropbox: commit後にGit管理ツリーをソースミラーへ同期し、`.env.local`と`.git`を含めない。
 - 次の作業: 次回以降のコード調査は、まずGraphify（query/path/explain）で当たりを付けてから該当箇所だけを読む運用を守る。
+
+### 2026-07-26 04:00 JST - Dropbox同期のObsidian知識Vaultをアプリ別構成で導入
+
+- 依頼: Obsidianを外部記憶として利用し、Dropboxで複数のデスクトップPCへ同期する。複数アプリを同じVault内でアプリごとに分離し、Instatic TalksXのGraphify知識を自動更新できるようにする。
+- Vault: `/Users/yoshito/Library/CloudStorage/Dropbox/web/アプリ知識`。`00_総合/`、`10_アプリ別/`、`90_共通知識/`を作成し、Instatic TalksXは`10_アプリ別/Instatic TalksX/`内に概要・設計・運用・意思決定・障害・機能別・Graphifyの番号フォルダで分離した。
+- 初期ノート: Vaultトップ、アプリ一覧、全アプリ共通ルール、Instatic TalksXホーム、概要、アーキテクチャ、デプロイ、意思決定、障害、動画クロップ、管理者権限を作成。Vaultへ秘密情報・本番個人データ・投稿本文・添付ファイルを保存しないルールを明記した。
+- Graphify: `90_Graphify/`へObsidian形式を出力。コード変更と更新スクリプトを含む最新グラフは267ノード、284関係、27コミュニティ。294件のMarkdownノートと`graph.canvas`を生成した。自動生成領域は手編集禁止。
+- 自動更新: `scripts/update-knowledge-vault.sh`と`npm run knowledge:update`を追加。管理画面用`public/system-map/`更新、Obsidian Graphify出力、秘密値マーカー検査を1コマンドで行う。別PCでは`KNOWLEDGE_VAULT_GRAPHIFY_DIR`で出力先を上書き可能。
+- 変更ファイル: `scripts/update-knowledge-vault.sh`、`package.json`、`README.md`、`AI_HANDOFF.md`、`PROJECT_PROGRESS.md`、`public/system-map/graph.html`、`public/system-map/GRAPH_REPORT.md`。Vault側はDropbox同期対象だがGitリポジトリ外。
+- DB・設定変更: Supabase、Cloud Run、SNS APIの変更なし。
+- 検証: `npm run knowledge:update`成功。Graphify code-only更新、Obsidian出力、秘密値ガードを完走。続けて`npm test`、`git diff --check`を実行する。
+- デプロイ: commit後に`main`へpushし、GitHub ActionsでGitHub Pagesへ公開する。OpenAI Sitesは変更しない。
+- Dropbox: ソースミラーとObsidian Vaultは別フォルダ。ソースミラーには`.env.local`と`.git`を含めない。VaultはDropbox同期完了後に別PCで同じフォルダをObsidian Vaultとして開く。
+- 次の作業: 別のアプリを追加する場合は`10_アプリ別/<アプリ名>/`を作り、そのアプリ固有のGraphify出力先を設定する。2台で同じノートを同時編集しない。

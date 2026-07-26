@@ -4,12 +4,12 @@
 - cluster-only mode — file stats not available
 
 ## Summary
-- 264 nodes · 282 edges · 26 communities (21 shown, 5 thin omitted)
+- 267 nodes · 284 edges · 27 communities (21 shown, 6 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 1 edges (avg confidence: 0.5)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `254ae115`
+- Built from commit: `78fe4d70`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -37,11 +37,12 @@
 - Community 20
 - Community 21
 - Community 22
-- Community 24
+- Community 23
+- Community 25
 
 ## God Nodes (most connected - your core abstractions)
 1. `compilerOptions` - 16 edges
-2. `scripts` - 10 edges
+2. `scripts` - 11 edges
 3. `processJob()` - 8 edges
 4. `include` - 7 edges
 5. `createCropPlan()` - 5 edges
@@ -66,7 +67,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (26 total, 5 thin omitted)
+## Communities (27 total, 6 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.06
@@ -85,12 +86,12 @@ Cohesion: 0.11
 Nodes (19): dom, dom.iterable, esnext, compilerOptions, allowJs, esModuleInterop, incremental, isolatedModules (+11 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.12
-Nodes (17): drizzle-orm, @heroui/react, @heroui/styles, lucide-react, next, dependencies, drizzle-orm, @heroui/react (+9 more)
+Cohesion: 0.11
+Nodes (17): engines, node, name, private, scripts, backup:dropbox, build, build:github-pages (+9 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.12
-Nodes (16): engines, node, name, private, scripts, backup:dropbox, build, build:github-pages (+8 more)
+Nodes (17): drizzle-orm, @heroui/react, @heroui/styles, lucide-react, next, dependencies, drizzle-orm, @heroui/react (+9 more)
 
 ### Community 6 - "Community 6"
 Cohesion: 0.23
@@ -145,19 +146,19 @@ Cohesion: 0.50
 Nodes (3): imports, @supabase/functions-js, @supabase/server
 
 ## Knowledge Gaps
-- **141 isolated node(s):** `ChatGPTUser`, `MediaAspect`, `aspectOptions`, `MediaEditorProps`, `eslintConfig` (+136 more)
+- **143 isolated node(s):** `ChatGPTUser`, `MediaAspect`, `aspectOptions`, `MediaEditorProps`, `eslintConfig` (+138 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **6 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `devDependencies` connect `Community 1` to `Community 5`?**
-  _High betweenness centrality (0.046) - this node is a cross-community bridge._
-- **Why does `dependencies` connect `Community 4` to `Community 5`?**
+- **Why does `devDependencies` connect `Community 1` to `Community 4`?**
+  _High betweenness centrality (0.045) - this node is a cross-community bridge._
+- **Why does `dependencies` connect `Community 5` to `Community 4`?**
   _High betweenness centrality (0.026) - this node is a cross-community bridge._
 - **What connects `ChatGPTUser`, `MediaAspect`, `aspectOptions` to the rest of the system?**
-  _141 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _143 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
   _Cohesion score 0.059743954480796585 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
