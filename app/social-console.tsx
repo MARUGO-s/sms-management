@@ -183,6 +183,19 @@ function createDefaultIntegrations(): Record<ChannelId, IntegrationConfig> {
   };
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error) return error.message;
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+  return fallback;
+}
+
 function formatDateTime(value: string | null) {
   if (!value) return "日時未設定";
   return new Intl.DateTimeFormat("ja-JP", {
@@ -460,10 +473,7 @@ export default function SocialConsole() {
     } catch (error) {
       setNotice({
         tone: "error",
-        text:
-          error instanceof Error
-            ? error.message
-            : "データの読み込みに失敗しました。",
+        text: getErrorMessage(error, "データの読み込みに失敗しました。"),
       });
     } finally {
       setDataLoading(false);
@@ -650,10 +660,7 @@ export default function SocialConsole() {
       }
       setNotice({
         tone: "error",
-        text:
-          error instanceof Error
-            ? error.message
-            : "予約投稿の保存に失敗しました。",
+        text: getErrorMessage(error, "予約投稿の保存に失敗しました。"),
       });
     } finally {
       setSavingPost(false);
@@ -760,10 +767,7 @@ export default function SocialConsole() {
     } catch (error) {
       setNotice({
         tone: "error",
-        text:
-          error instanceof Error
-            ? error.message
-            : "連携情報の保存に失敗しました。",
+        text: getErrorMessage(error, "連携情報の保存に失敗しました。"),
       });
     } finally {
       setSavingIntegration(false);
@@ -820,10 +824,7 @@ export default function SocialConsole() {
     } catch (error) {
       setNotice({
         tone: "error",
-        text:
-          error instanceof Error
-            ? error.message
-            : "連携情報の削除に失敗しました。",
+        text: getErrorMessage(error, "連携情報の削除に失敗しました。"),
       });
     } finally {
       setSavingIntegration(false);

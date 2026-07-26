@@ -16,7 +16,7 @@ The owner-only production deployment is:
 - Supabase schema is deployed through `supabase/migrations/`.
 - Supabase tables: `social_workspaces`, `social_workspace_members`, `social_posts`, `social_post_channels`, `social_post_files`, `social_integrations`, `social_integration_secrets`.
 - Private Supabase Storage bucket: `post-files`.
-- RLS policies are enabled for authenticated users. Supabase Advisors returned no issues after policy consolidation.
+- RLS policies are enabled for authenticated users. Workspace membership checks run through non-exposed `private` schema functions to prevent policy recursion.
 - Supabase Auth email/password sign-in protects all app data.
 - Posts, history, channels, and file metadata are stored in Postgres. File bytes are stored in private Storage.
 - SNS secrets are written only through the authenticated `integration-secrets` Edge Function. Browser clients never read stored secret values.
@@ -55,6 +55,8 @@ Email confirmation is enabled. Before inviting production users, an owner must o
 
 The currently authenticated Supabase CLI account can deploy migrations and functions but receives `403` for the Auth configuration Management API. Do not work around this with database changes; complete it with a Supabase project owner account.
 
+Supabase Advisors currently reports one Auth warning: leaked-password protection is disabled. Enable it in the Supabase Authentication password-security settings before expanding access beyond the owner.
+
 ## Dropbox backup
 
 Supabase is the production source of truth. Dropbox is a local backup destination only. The backup script writes table JSON and files under:
@@ -69,3 +71,5 @@ Repository: `https://github.com/MARUGO-s/sms-management`
 Branch: `main`
 
 Before changing the database, create a migration with `supabase migration new <name>`, apply it with `supabase db push --linked`, verify it with `supabase db query --linked`, and run Supabase Advisors.
+
+The migration `20260726111630_fix_social_rls_recursion.sql` fixes the login-time workspace load failure caused by circular RLS policy references. Its authenticated create/read verification must remain rollback-only so no test workspace is left in production.
