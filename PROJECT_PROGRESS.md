@@ -3,10 +3,10 @@
 ## 文書情報
 
 - 記録日時: 2026-07-26 21:50:36 JST
-- 最終更新日時: 2026-07-27 00:25 JST
+- 最終更新日時: 2026-07-26 03:26 JST
 - 対象リポジトリ: `https://github.com/MARUGO-s/sms-management.git`
 - 対象ブランチ: `main`
-- 現在のHEAD: `bb23a9a221221b53fa7394b72ed22c9a0dcabfa1`
+- 作業開始時HEAD: `254ae115195425d8672983eb765240713aaebf4f`
 - ローカル作業場所: `/Users/yoshito/Documents/New project`
 - 本番URL: `https://instatic-talksx.yoshito0428.chatgpt.site`
 - 管理者URL: `https://instatic-talksx.yoshito0428.chatgpt.site/admin`
@@ -1034,3 +1034,17 @@ supabase functions deploy media-jobs --use-api
 - テスト: `npm run build:github-pages`が`/`と`/admin`を静的生成し、`dist/client/index.html`と`dist/client/admin/index.html`を確認。静的HTML/RSC内のアセット参照が`/sms-management/`配下になることを検査。`npm test`は7件すべて成功、`git diff --check`成功。
 - 必須の手動設定: Supabase Dashboard > Authentication > URL ConfigurationのRedirect URLsに`https://marugo-s.github.io/sms-management/**`を追加する。追加前はGitHub Pages上のメール確認、パスワード再設定、Google OAuthの戻り先が拒否されるため、本番ログイン確認を行わない。
 - 次の作業: 本commitを`main`へpushし、GitHub ActionsのPagesデプロイ成功を確認。次にGitHub Pages URLをブラウザで開き、ログイン画面、`/admin/`、システムマップのアセット読み込みを確認する。SupabaseのRedirect URL追加後にメール認証またはGoogle OAuthを1回実操作で確認する。
+
+### 2026-07-26 03:26 JST - Graphifyシステムマップを最新コードへ更新
+
+- 依頼: Graphifyの既存グラフを最新化し、管理画面用システムマップの更新、コードグラフへの質問、`appPath()`ノードの説明をすべて実施する。
+- 実施内容: `npm run graphify:system-map`を実行し、commit `254ae115`時点のコードを再抽出・クラスタリング。管理画面が参照する`public/system-map/graph.html`と`GRAPH_REPORT.md`を更新した。Graphify query/path/explainで動画クロップ、管理者画面、GitHub Pages向けbase pathの構造を確認した。
+- Graphify結果: 264ノード、282関係、26コミュニティ。前回の254ノード、269関係、25コミュニティから増加。`appPath()`が5関係のGod Nodeとして追加され、`SocialConsole()`および`AdminConsole()`から呼び出される構造を確認。
+- 経路確認: `processJob()`は`probeVideo()`、`createCropPlan()`、`run()`、`updateJob()`等を呼び出す。`createCropPlan()`は`clamp()`を使用し、テストからもimportされる。UIとCloud Run worker間はSupabase DB、Edge Function、Cloud Runの実行時境界をまたぐため、コード限定の静的グラフでは単一の`path`として接続されない。
+- 管理者権限確認: 管理者UIの`AdminConsole()`は抽出されたが、権限付与・解除の中核はSupabase migration内のSQL/RLS/triggerであり、現在のGraphifyコード抽出対象ではSQL migrationが分類されないため、自然言語queryだけでは該当ノードを返さなかった。権限設計の検証にはmigrationを直接確認する。
+- 変更ファイル: `public/system-map/graph.html`、`public/system-map/GRAPH_REPORT.md`、`PROJECT_PROGRESS.md`。
+- DB・設定変更: Supabase migration、Edge Function、Cloud Run、Google Cloud、SNS API設定の変更なし。
+- テスト: `npm test`成功。7件すべてpassし、ビルドも成功。
+- デプロイ: 本作業のcommitを`main`へpushするとGitHub ActionsがGitHub Pagesへ自動公開する。OpenAI Sitesはこの作業では変更しない。
+- Dropbox: commit後にGit管理ツリーを`/Users/yoshito/Library/CloudStorage/Dropbox/web/instatic-talksx/`へ同期し、`.env.local`と`.git`を含めない。
+- 次の作業: GitHub ActionsのPagesデプロイ成功後、`/sms-management/admin/`でシステムマップが264ノード、282関係の最新版として開くことを確認する。管理者権限フローをGraphifyで横断探索したい場合は、SQL migrationを安全に含める抽出設計を別途追加する。

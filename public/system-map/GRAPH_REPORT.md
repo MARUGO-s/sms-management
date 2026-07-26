@@ -4,12 +4,12 @@
 - cluster-only mode — file stats not available
 
 ## Summary
-- 254 nodes · 269 edges · 25 communities (19 shown, 6 thin omitted)
+- 264 nodes · 282 edges · 26 communities (21 shown, 5 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 1 edges (avg confidence: 0.5)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `b2f22b27`
+- Built from commit: `254ae115`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -36,36 +36,41 @@
 - Community 19
 - Community 20
 - Community 21
-- Community 23
+- Community 22
+- Community 24
 
 ## God Nodes (most connected - your core abstractions)
 1. `compilerOptions` - 16 edges
-2. `scripts` - 9 edges
+2. `scripts` - 10 edges
 3. `processJob()` - 8 edges
 4. `include` - 7 edges
 5. `createCropPlan()` - 5 edges
-6. `safeRelativeReturnPath()` - 4 edges
-7. `getDb()` - 4 edges
-8. `lib` - 4 edges
-9. `rest()` - 4 edges
-10. `AdminConsole()` - 4 edges
+6. `AdminConsole()` - 5 edges
+7. `appPath()` - 5 edges
+8. `safeRelativeReturnPath()` - 4 edges
+9. `getDb()` - 4 edges
+10. `lib` - 4 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `GET()` --calls--> `getDb()`  [EXTRACTED]
   examples/d1/app/api/notes/route.ts → db/index.ts
 - `POST()` --calls--> `getDb()`  [EXTRACTED]
   examples/d1/app/api/notes/route.ts → db/index.ts
+- `SocialConsole()` --calls--> `appPath()`  [EXTRACTED]
+  app/social-console.tsx → app/lib/public-path.ts
 - `processJob()` --calls--> `createCropPlan()`  [EXTRACTED]
   workers/media-processor/processor.mjs → workers/media-processor/crop-plan.mjs
+- `AdminConsole()` --calls--> `appPath()`  [EXTRACTED]
+  app/admin/admin-console.tsx → app/lib/public-path.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (25 total, 6 thin omitted)
+## Communities (26 total, 5 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.06
-Nodes (29): aspectOptions, defaultMediaCrop, MediaAspect, MediaCropConfig, MediaEditor(), MediaEditorProps, ApiStatus, channelById (+21 more)
+Nodes (28): aspectOptions, defaultMediaCrop, MediaAspect, MediaCropConfig, MediaEditorProps, ApiStatus, channelById, ChannelId (+20 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.06
@@ -73,7 +78,7 @@ Nodes (33): @cloudflare/vite-plugin, drizzle-kit, eslint, eslint-config-next, de
 
 ### Community 2 - "Community 2"
 Cohesion: 0.10
-Nodes (19): AccessState, actionLabels, AdminConsole(), AdminUserRow, AdminView, adminViews, AuditRow, entityLabels (+11 more)
+Nodes (20): AccessState, actionLabels, AdminConsole(), AdminUserRow, AdminView, adminViews, AuditRow, entityLabels (+12 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.11
@@ -85,7 +90,7 @@ Nodes (17): drizzle-orm, @heroui/react, @heroui/styles, lucide-react, next, depe
 
 ### Community 5 - "Community 5"
 Cohesion: 0.12
-Nodes (15): engines, node, name, private, scripts, backup:dropbox, build, db:generate (+7 more)
+Nodes (16): engines, node, name, private, scripts, backup:dropbox, build, build:github-pages (+8 more)
 
 ### Community 6 - "Community 6"
 Cohesion: 0.23
@@ -117,39 +122,47 @@ Nodes (3): Env, ExecutionContext, worker
 
 ### Community 13 - "Community 13"
 Cohesion: 0.33
-Nodes (4): Action, ChannelId, channels, secretFields
+Nodes (4): expression, normalizedBasePath, outputDirectory, prefixes
 
 ### Community 14 - "Community 14"
+Cohesion: 0.33
+Nodes (4): Action, ChannelId, channels, secretFields
+
+### Community 15 - "Community 15"
 Cohesion: 0.33
 Nodes (5): name, private, scripts, test, type
 
 ### Community 16 - "Community 16"
-Cohesion: 0.50
-Nodes (3): imports, @supabase/functions-js, @supabase/server
+Cohesion: 0.40
+Nodes (3): geistMono, geistSans, metadata
 
 ### Community 17 - "Community 17"
 Cohesion: 0.50
 Nodes (3): imports, @supabase/functions-js, @supabase/server
 
+### Community 18 - "Community 18"
+Cohesion: 0.50
+Nodes (3): imports, @supabase/functions-js, @supabase/server
+
 ## Knowledge Gaps
-- **135 isolated node(s):** `ChatGPTUser`, `geistSans`, `geistMono`, `MediaAspect`, `aspectOptions` (+130 more)
+- **141 isolated node(s):** `ChatGPTUser`, `MediaAspect`, `aspectOptions`, `MediaEditorProps`, `eslintConfig` (+136 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **6 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `devDependencies` connect `Community 1` to `Community 5`?**
-  _High betweenness centrality (0.048) - this node is a cross-community bridge._
+  _High betweenness centrality (0.046) - this node is a cross-community bridge._
 - **Why does `dependencies` connect `Community 4` to `Community 5`?**
-  _High betweenness centrality (0.028) - this node is a cross-community bridge._
-- **What connects `ChatGPTUser`, `geistSans`, `geistMono` to the rest of the system?**
-  _135 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _High betweenness centrality (0.026) - this node is a cross-community bridge._
+- **What connects `ChatGPTUser`, `MediaAspect`, `aspectOptions` to the rest of the system?**
+  _141 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.06306306306306306 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.059743954480796585 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
   _Cohesion score 0.06060606060606061 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
-  _Cohesion score 0.09881422924901186 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09666666666666666 - nodes in this community are weakly interconnected._
 - **Should `Community 3` be split into smaller, more focused modules?**
   _Cohesion score 0.10526315789473684 - nodes in this community are weakly interconnected._
