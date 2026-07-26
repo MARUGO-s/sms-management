@@ -121,7 +121,7 @@ Cloud Run向けメディアワーカーはDocker Desktopでローカル検証で
 npm run worker:docker:check
 ```
 
-このコマンドはイメージbuild、Node・FFmpeg・libx264・非root実行、crop-planテストを確認します。Docker Desktopで他アプリのSupabaseコンテナが動作している場合、それらを停止・再作成せず、Instatic TalksXのワーカーイメージだけを独立して検証します。
+このコマンドは`linux/amd64`イメージbuild、Node・FFmpeg・libx264・非root実行、crop-planテストに加え、実際の短いテスト動画を9:16のH.264/AAC MP4（1080×1920）へ変換して`ffprobe`で検証します。プラットフォームを変える場合は`MEDIA_WORKER_DOCKER_PLATFORM`を指定します。Docker Desktopで他アプリのSupabaseコンテナが動作している場合、それらを停止・再作成せず、Instatic TalksXのワーカーイメージだけを独立して検証します。
 
 ## Supabase
 

@@ -504,7 +504,7 @@ const checklistDoc = `# AI作業チェックリスト
 ## 終了
 - [ ] build / lint / testが成功した
 - [ ] UI変更は実画面で確認した
-- [ ] media worker変更時はDockerイメージ・FFmpeg・crop-planを検証した（他コンテナは変更しない）
+- [ ] media worker変更時は \`npm run worker:docker:check\` でlinux/amd64・FFmpeg/libx264・非root・crop-plan・実MP4変換を検証した（他コンテナは変更しない）
 - [ ] \`PROJECT_PROGRESS.md\` を更新した
 - [ ] 関連する手書きObsidianノートへ書き戻した
 - [ ] 構造変更後に \`npm run knowledge:update\` を実行した

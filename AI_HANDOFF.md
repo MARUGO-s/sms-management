@@ -177,7 +177,7 @@ Durable project knowledge is kept in an Obsidian vault stored in Dropbox and syn
 - Override the app folder with `KNOWLEDGE_VAULT_APP_DIR`, or only the Graphify output with `KNOWLEDGE_VAULT_GRAPHIFY_DIR`, if paths differ on another machine.
 - Vault is code-and-docs knowledge only: never store `.env`, secret keys, service role keys, SNS tokens, production personal data, post bodies, or uploaded files in it.
 - Dropbox syncs the vault between desktop PCs. Do not edit the same note on two machines at once; let sync finish first. Mobile sync via Dropbox is unreliable; use Obsidian Sync if mobile is needed.
-- Docker Desktop can be used to build and test `workers/media-processor/` locally before Cloud Run deployment. Run `npm run worker:docker:check`; it verifies Node, FFmpeg, libx264, non-root runtime, and crop-plan tests. Keep this isolated: do not stop, recreate, or modify unrelated running Supabase containers.
+- Docker Desktop can be used to build and test `workers/media-processor/` locally before Cloud Run deployment. Run `npm run worker:docker:check`; it builds `linux/amd64` by default and verifies Node, FFmpeg, libx264, non-root runtime, crop-plan tests, and a real 1080x1920 H.264/AAC MP4 encode/probe smoke test. Keep this isolated: do not stop, recreate, or modify unrelated running Supabase containers.
 
 ## Production site access
 

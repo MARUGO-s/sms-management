@@ -183,7 +183,7 @@
       "view": "runtime",
       "label": "Docker Desktop\nローカルワーカー検証",
       "group": "automation",
-      "description": "Cloud Run用Dockerfileをローカルbuildし、Node・FFmpeg・libx264・crop-planを検証。",
+      "description": "linux/amd64でbuildし、Node・FFmpeg・libx264・非root・crop-plan・実MP4変換を検証。",
       "x": 900,
       "y": 660,
       "width": 230,
@@ -380,7 +380,7 @@
       "view": "runtime",
       "from": "docker_validation",
       "to": "artifact_registry",
-      "label": "同じコンテナ契約を事前検証",
+      "label": "amd64コンテナ契約を事前検証",
       "kind": "delivery"
     },
     {
