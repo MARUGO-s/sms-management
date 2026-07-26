@@ -991,4 +991,15 @@ supabase functions deploy media-jobs --use-api
 - DB・設定変更: なし。GitHub Pagesはアプリ実行環境ではなく、本番アプリはOpenAI Sites上で動作するため、Pages側は本番URLへの入口として扱う。
 - 検証: `git diff --check`とHTML内容を確認。GitHub Pagesの反映後、`https://marugo-s.github.io/sms-management/`を開き、本番URLへ遷移することを確認する。GitHub Pagesの反映には数分かかる場合がある。
 - 未完了事項: GitHub Pagesのリモート反映後のブラウザ確認は未完了。ブラウザキャッシュが残る場合はプライベートウィンドウまたは強制再読み込みを使う。
-- 次の作業: GitHub Pages URLを再読込し、本番アプリへ遷移することを確認。アプリの機能変更は本番Sites側のデプロイで行い、GitHub Pages用の`index.html`をアプリ本体と混同しない。
+ - 次の作業: GitHub Pages URLを再読込し、本番アプリへ遷移することを確認。アプリの機能変更は本番Sites側のデプロイで行い、GitHub Pages用の`index.html`をアプリ本体と混同しない。
+
+### 2026-07-27 01:00 JST - 予約投稿キャンセル機能を追加
+
+- 依頼: 投稿の予約をキャンセルできるようにする。
+- 実施内容: 予約一覧の各予約投稿にキャンセルボタンを追加。確認ダイアログ後、対象投稿がまだ`scheduled`の場合だけ`status=draft`、`scheduled_at=null`へ更新し、本文・添付ファイル・履歴は削除しない。キャンセル後は予約一覧から消え、履歴の下書きとして残る。
+- 変更ファイル: `app/social-console.tsx`、`app/globals.css`、`PROJECT_PROGRESS.md`、`AI_HANDOFF.md`。
+- DB・設定変更: migrationなし。既存のworkspace member RLS付き`social_posts` UPDATEを使用し、対象状態を`scheduled`に限定。
+- テスト: `npm test`成功。既存7テスト全てpass。`git diff --check`成功。
+- デプロイ: Sites本番デプロイ待ち。Supabase DB・Edge Function変更なし。
+- 未完了事項: 本番画面で予約キャンセル操作をまだ実行していない。デプロイ後、予約投稿を1件選び、確認ダイアログ、予約一覧からの消失、履歴での下書き表示を確認する。
+- 次の作業: Sitesへ本番公開し、実画面で予約キャンセルを確認する。既存の動画Cloud Run資源や秘密値は触らない。

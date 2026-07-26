@@ -36,6 +36,7 @@ import {
   Trash2,
   Video,
   Wand2,
+  XCircle,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -1080,6 +1081,42 @@ export default function SocialConsole() {
     }
   }
 
+  async function cancelScheduledPost(postId: string) {
+    if (!supabase || !user) return;
+    const target = history.find((record) => record.id === postId);
+    if (!target || target.status !== "予約済み") return;
+    if (!window.confirm("この予約投稿をキャンセルして下書きに戻しますか？")) {
+      return;
+    }
+
+    setNotice(null);
+    const { data: updatedPost, error } = await supabase
+      .from("social_posts")
+      .update({
+        status: "draft",
+        scheduled_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", postId)
+      .eq("status", "scheduled")
+      .select("id")
+      .maybeSingle();
+
+    if (error || !updatedPost) {
+      setNotice({
+        tone: "error",
+        text: getErrorMessage(error, "予約投稿のキャンセルに失敗しました。"),
+      });
+      return;
+    }
+
+    setNotice({
+      tone: "success",
+      text: "予約投稿をキャンセルし、下書きに戻しました。",
+    });
+    await loadWorkspaceData(user);
+  }
+
   async function downloadFile(file: SavedFile) {
     if (!supabase) return;
     const { data, error } = await supabase.storage
@@ -1889,7 +1926,18 @@ export default function SocialConsole() {
                           ))}
                         </div>
                       </div>
-                      <span className="status-pill ready">{post.status}</span>
+                      <div className="queue-actions">
+                        <span className="status-pill ready">{post.status}</span>
+                        <button
+                          className="queue-cancel-button"
+                          type="button"
+                          onClick={() => void cancelScheduledPost(post.id)}
+                          aria-label={`${post.title}の予約をキャンセル`}
+                        >
+                          <XCircle aria-hidden="true" size={15} />
+                          <span>キャンセル</span>
+                        </button>
+                      </div>
                     </article>
                   ))
                 ) : (

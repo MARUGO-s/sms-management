@@ -122,6 +122,10 @@ The worker image build reported `STATUS: SUCCESS`, and the Cloud Run Job was cre
 
 The service-account JSON was used to create the Supabase Edge Function secret and then removed from Cloud Shell. The local downloaded copy should be removed from the Mac Downloads folder. Never place the JSON, Supabase secret key, Google key, SNS secrets, or any secret values in Git, this file, `PROJECT_PROGRESS.md`, Dropbox source mirror, chat, or screenshots.
 
+## Reservation cancellation
+
+The reservation view now has a `キャンセル` button for each scheduled post. The action confirms with the user, updates only a still-`scheduled` row to `status=draft` and `scheduled_at=null`, and keeps the post body and attachments. The post disappears from the reservation queue and remains available in History as a draft. No migration or Edge Function change was needed; existing workspace RLS controls the update. `npm test` passed after this change. The change still needs a production Sites deployment and one real UI verification.
+
 ## GitHub Pages entrypoint
 
 GitHub Pages previously showed the repository README because the repository is not a static export of the Vinext application. The actual application remains deployed at `https://instatic-talksx.yoshito0428.chatgpt.site`. A root `index.html` was added to redirect GitHub Pages visitors to that production URL. After the commit is pushed, verify `https://marugo-s.github.io/sms-management/` after the Pages deployment finishes. Do not move Supabase keys or the server application into GitHub Pages; the redirect file contains no secrets.
