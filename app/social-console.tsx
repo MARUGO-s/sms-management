@@ -937,7 +937,7 @@ export default function SocialConsole() {
                 autoComplete={
                   authMode === "signin" ? "current-password" : "new-password"
                 }
-                minLength={12}
+                minLength={authMode === "signup" ? 12 : undefined}
                 required
               />
             </label>
