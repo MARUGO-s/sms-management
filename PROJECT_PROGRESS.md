@@ -3,7 +3,7 @@
 ## 文書情報
 
 - 記録日時: 2026-07-26 21:50:36 JST
-- 最終更新日時: 2026-07-27 04:41 JST（2026-07-26 19:41 UTC）
+- 最終更新日時: 2026-07-27 04:53 JST（2026-07-26 19:53 UTC）
 - 対象リポジトリ: `https://github.com/MARUGO-s/sms-management.git`
 - 対象ブランチ: `main`
 - 作業開始時HEAD: `cbf7d20c07b715c49a9bbc911343a1318fe72b0e`
@@ -1126,7 +1126,8 @@ supabase functions deploy media-jobs --use-api
 - 変更ファイル: `AGENTS.md`、`.graphifyignore`、`knowledge/system-architecture.json`、`docs/AI_CONTEXT.md`、`docs/AI_KNOWLEDGE_SYSTEM.md`、`scripts/generate-knowledge-system.mjs`、`scripts/check-knowledge-system.mjs`、`scripts/search-knowledge-vault.mjs`、`scripts/check-media-worker-docker.sh`、`scripts/update-knowledge-vault.sh`、`package.json`、管理画面/CSS、公開system-map生成物、テスト、README、AI handoff、進行記録。Obsidian側はDropbox同期対象でGit外。
 - DB・設定変更: Supabase DB migration、Edge Function本番、Cloud Run本番、Google Cloud IAM/Secret、SNS API設定の変更なし。既存Dockerコンテナの停止・再作成なし。
 - テスト: `npm run knowledge:update`成功、`npm run knowledge:check`成功、`npm run lint`はerror 0・既存warning 1、`npm test`は9件すべてpass、`npm run build:github-pages`成功、`npm run worker:docker:check`成功。`knowledge:search`で動画クロップ、管理者権限、Docker/Cloud Run知識が手書きノートから取得できることを確認。
-- デプロイ: 本作業commitを`main`へpush後、GitHub ActionsのPagesデプロイ成功と公開URLの`environment.html`、`graph.html`、`graph-stats.json`、管理画面導線を確認する。OpenAI Sites、Supabase、Cloud Run本番は変更しない。
+- Git: 統合実装commit `96acd595c8483e09d836a2e907fbd27e6519f8d9`と、同commitを基準にGraphify生成物を揃えるcommit `d0e49dc512436ec4cb1cbb784ffbce98ed66f5ce`を`main`へpush。
+- デプロイ: GitHub Actions `Deploy Instatic TalksX to GitHub Pages` run `30217679345`は成功。`/`、`/admin/`、`/system-map/environment.html`、`graph.html`、`graph-stats.json`、`knowledge-system-manifest.json`がすべてHTTP 200。公開環境図にGraphify × Obsidian × AI、Docker Desktop、326ノード、343関係、32コミュニティを確認。公開manifestにローカル`/Users/`パスが無いことを確認。OpenAI Sites、Supabase、Cloud Run本番は変更していない。
 - Dropbox: commit後にGit管理ツリーを`instatic-talksx`ソースミラーへ同期し、`.git`と`.env*`を含めない。Obsidian Vaultは`アプリ知識`で独立同期し、同じノートを複数PCで同時編集しない。
 - 未完了事項: 認証済み本番`/admin`でシステムマップの2表示を切り替える最終操作確認。本番データに関する既存未完了（9分16秒動画の変換済みMP4再生確認、SNS実連携）は継続。
-- 次の作業: GitHub Pages公開確認後、次の開発依頼からこの知識フローを実運用する。別アプリをVaultへ追加する際は、アプリ固有の`70_AI作業環境/`、`90_Graphify/`、構成モデル、更新/検査/検索コマンドを同じ設計で用意する。
+- 次の作業: 次の開発依頼からこの知識フローを実運用する。別アプリをVaultへ追加する際は、アプリ固有の`70_AI作業環境/`、`90_Graphify/`、構成モデル、更新/検査/検索コマンドを同じ設計で用意する。
