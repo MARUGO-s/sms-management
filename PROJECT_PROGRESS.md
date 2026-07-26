@@ -3,7 +3,7 @@
 ## 文書情報
 
 - 記録日時: 2026-07-26 21:50:36 JST
-- 最終更新日時: 2026-07-26 22:25:38 JST
+- 最終更新日時: 2026-07-26 22:32:53 JST
 - 対象リポジトリ: `https://github.com/MARUGO-s/sms-management.git`
 - 対象ブランチ: `main`
 - 今回の作業開始時HEAD: `c7f462e737ba20c3233f3620baea999785f175fd`
@@ -135,9 +135,9 @@ Instatic TalksXは、Instagram、TikTok、X、Threadsの運用情報を一括管
 - Sites project ID: `appgprj_6a65e85b2c6c8191b197204738f2e23f`
 - `.openai/hosting.json`にproject IDを保存
 - アクセスモード: 所有者のみのカスタムアクセス
-- 最新Sitesバージョン: v7
-- v7のsource commit: `04b3451445a82d1a3ad3a69d039b6aa1f702ccc9`
-- v7は本番公開済み
+- 最新Sitesバージョン: v8
+- v8のsource commit: `ed6ecf98e37ebd3d5096f3c71f6f1716a02bde54`
+- v8は本番公開済み
 
 ## 通常画面の機能
 
@@ -477,11 +477,11 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
 
 ## Gitの状態
 
-記録作成直前の状態:
+店舗所属・予約予定機能の実装反映時点:
 
 - ブランチ: `main`
-- HEAD: `04b3451445a82d1a3ad3a69d039b6aa1f702ccc9`
-- Working tree: clean
+- 実装commit: `ed6ecf98e37ebd3d5096f3c71f6f1716a02bde54`
+- 実装commitはGitHub `origin/main`へpush済み
 - Remote: `origin`
 - Remote URL: `https://github.com/MARUGO-s/sms-management.git`
 
@@ -489,6 +489,10 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
 
 | Commit | 日時 | 内容 |
 | --- | --- | --- |
+| `ed6ecf9` | 2026-07-26 22:28 JST | Add store-scoped social operations |
+| `c7f462e` | 2026-07-26 21:57 JST | Record completed handoff synchronization |
+| `356f127` | 2026-07-26 21:55 JST | Require continuous AI handoff records |
+| `62fc116` | 2026-07-26 21:51 JST | Add detailed project progress record |
 | `04b3451` | 2026-07-26 21:45 JST | Manage administrators from admin console |
 | `06be302` | 2026-07-26 21:38 JST | Document Dropbox secret handoff |
 | `c86dece` | 2026-07-26 21:31 JST | Add administrator operations console |
@@ -624,6 +628,12 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
 - 新規登録画面を1280pxデスクトップで確認
 - 新規登録画面を390 x 844のモバイルで確認
 - デスクトップ、モバイルとも画面全体の横方向オーバーフローがないことを確認
+- 本番通常画面で既存利用者向けの「所属店舗を設定」を表示
+- 本番管理者画面で店舗数23、全店舗フィルター、店舗別運用状況を表示
+- 本番管理者画面で`BLU NERO`へ切り替えると見出しが店舗別表示へ変わることを確認
+- 本番管理者画面で予約予定タブと時系列一覧を表示
+- 本番管理者画面をデスクトップと390 x 844のモバイルで確認
+- 本番管理者画面のモバイル幅で横方向オーバーフローがないことを確認
 - 本番通常画面へGoogle OAuthでログイン
 - 通常画面に管理者リンクが管理者だけ表示
 - `/admin`の全体件数を表示
@@ -841,3 +851,18 @@ supabase functions deploy integration-secrets --use-api
 - Dropbox: ソースミラーへ同期し、内容一致と`.env*`除外を確認。
 - 未完了事項: なし。
 - 次の作業: 次回のAIは作業前にこの文書を読み、作業後にこのログ末尾へ記録を追加する。
+
+### 2026-07-26 22:32 JST - 店舗所属と店舗別管理・予約予定を追加
+
+- 依頼: MARUGO GROUP公式サイトの店舗と`BLU NERO`を登録し、新規登録時の所属店舗選択、通常画面の店舗表示、管理者画面の店舗別表示と予約予定を追加する。
+- 実施内容: 公式ブランドページの22店舗に`BLU NERO`を加えた23店舗マスターを作成。メール・Google OAuth登録、既存利用者の初回設定、通常画面の店舗表示、管理者の全店舗／店舗別フィルター、店舗別運用状況、予約予定タブを実装。
+- 変更ファイル: `app/social-console.tsx`、`app/admin/admin-console.tsx`、`app/globals.css`、`tests/rendered-html.test.mjs`、`supabase/migrations/20260726130739_add_social_store_affiliation.sql`、`README.md`、`AI_HANDOFF.md`、`PROJECT_PROGRESS.md`。
+- DB・設定変更: migration `20260726130739_add_social_store_affiliation.sql`を本番Supabaseへ適用。`social_stores`、プロフィールとワークスペースの`store_id`、店舗RLS、登録metadata検証triggerを追加。店舗23件と`BLU NERO`を確認。
+- RLS検証: 匿名の有効店舗SELECTとINSERT拒否、認証済み利用者の未設定店舗の一度限り設定、二度目の変更拒否をTransactionとRollbackで確認。本番の既存プロフィールとワークスペースは未設定のまま。
+- テスト: `npm test` 4件成功、`npm run build`成功、`npm run lint`は既存warning 1件・error 0、`git diff --check`成功、差分の秘密値スキャン該当なし。
+- 実画面: ローカル登録画面を1280pxと390 x 844で確認。本番通常画面の既存利用者向け所属設定、本番管理者の23店舗、全店舗／店舗別、予約予定、デスクトップと390 x 844を確認。店舗の確定操作は行わず、本番データを変更していない。
+- デプロイ: Sites v8を所有者限定のまま本番公開。URLは`https://instatic-talksx.yoshito0428.chatgpt.site`、source commitは`ed6ecf98e37ebd3d5096f3c71f6f1716a02bde54`。
+- Git: 実装commit `ed6ecf9`を`main`へpush。記録更新も同じ`main`へ追加commitしてpushする。
+- Dropbox: 除外規則を維持してソースミラーへ同期し、`PROJECT_PROGRESS.md`の一致と`.env*`除外を再確認する。
+- 未完了事項: 既存利用者1名と既存ワークスペース1件は所属店舗未設定。利用者が次回通常画面で正しい店舗を一度選択する必要がある。管理者による後からの所属店舗変更UIは未実装。
+- 次の作業: 利用者が所属店舗を選択後、店舗名が通常画面へ表示されることを確認。その後、優先するSNSのOAuthと実投稿処理へ進む。
