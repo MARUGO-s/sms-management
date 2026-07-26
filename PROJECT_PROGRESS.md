@@ -1012,5 +1012,6 @@ supabase functions deploy media-jobs --use-api
 - 生成結果: 254ノード、269関係、25コミュニティ。Graph診断でmissing edge、dangling edge、self-loop、collapsed edgeは0件。
 - 変更ファイル: `app/admin/admin-console.tsx`、`app/globals.css`、`public/system-map/graph.html`、`public/system-map/GRAPH_REPORT.md`、`scripts/refresh-system-map.sh`、`package.json`、`.gitignore`、`README.md`、`AI_HANDOFF.md`、テスト。
 - DB・設定変更: Supabase migration、Edge Function、Cloud Run、Google Cloud、SNS APIの変更なし。Graphify CLIはCodex開発環境にのみインストール済みで、アプリ利用者端末に依存関係を追加していない。
-- 検証・デプロイ: `npm test`、実際の管理画面表示、Git差分・秘密情報確認、Sites本番公開をこの後に実施して結果を追記する。
+- 検証: `npm test`は7件すべて成功、`git diff --check`成功。ローカルで`/admin`の既存管理者ログイン制限を確認し、`/system-map/graph.html`が254ノード・269関係のインタラクティブグラフとして描画されることを確認。公開対象の秘密値スキャンで新規の秘密値混入なし。
+- デプロイ: Sites v11を所有者限定アクセスのまま本番公開。URLは`https://instatic-talksx.yoshito0428.chatgpt.site`、source commitは`827d5ddf03a7e6e4699dfd69cf949b813df012d0`。Supabase DB・Edge Function、Cloud Run、Google Cloudの変更なし。
 - 次の作業: コード構成を大きく変更した時だけ`npm run graphify:system-map`を実行し、生成された公開用マップをレビューしてから本番へデプロイする。Graphifyを実データ処理に使う場合は、別途Supabase RLS・Storage・Cloud Runを含む設計を行う。
