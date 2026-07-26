@@ -51,8 +51,17 @@ test("starter preview files are not part of the finished site", async () => {
   );
 });
 
-test("store affiliation and administrator schedules remain wired into the app", async () => {
-  const [consoleSource, adminSource, migrationSource, graphAsset] =
+test("store affiliation, administrator schedules, and knowledge maps remain wired into the app", async () => {
+  const [
+    consoleSource,
+    adminSource,
+    migrationSource,
+    graphAsset,
+    environmentAsset,
+    graphStats,
+    packageSource,
+    agentRules,
+  ] =
     await Promise.all([
     readFile(new URL("../app/social-console.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/admin/admin-console.tsx", import.meta.url), "utf8"),
@@ -64,6 +73,16 @@ test("store affiliation and administrator schedules remain wired into the app", 
       "utf8",
     ),
     readFile(new URL("../public/system-map/graph.html", import.meta.url), "utf8"),
+    readFile(
+      new URL("../public/system-map/environment.html", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../public/system-map/graph-stats.json", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../package.json", import.meta.url), "utf8"),
+    readFile(new URL("../AGENTS.md", import.meta.url), "utf8"),
   ]);
 
   assert.match(consoleSource, /所属店舗/);
@@ -73,9 +92,22 @@ test("store affiliation and administrator schedules remain wired into the app", 
   assert.match(adminSource, /全店舗/);
   assert.match(adminSource, /システムマップ/);
   assert.match(adminSource, /\/system-map\/graph\.html/);
+  assert.match(adminSource, /\/system-map\/environment\.html/);
+  assert.match(adminSource, /\/system-map\/graph-stats\.json/);
+  assert.match(adminSource, /実行環境・AI知識循環/);
   assert.match(migrationSource, /create table public\.social_stores/);
   assert.match(migrationSource, /'BLU NERO'/);
   assert.match(graphAsset, /vis-network/);
+  assert.match(environmentAsset, /Graphify × Obsidian × AI/);
+  assert.match(environmentAsset, /AI・Graphify・Obsidian知識循環/);
+  const parsedStats = JSON.parse(graphStats);
+  assert.ok(parsedStats.nodes > 0);
+  assert.ok(parsedStats.edges > 0);
+  assert.ok(parsedStats.communities > 0);
+  assert.match(packageSource, /"knowledge:update"/);
+  assert.match(packageSource, /"knowledge:check"/);
+  assert.match(agentRules, /Graphify-first investigation/);
+  assert.match(agentRules, /Obsidian/);
 });
 
 test("video crop jobs keep originals and use the protected worker flow", async () => {

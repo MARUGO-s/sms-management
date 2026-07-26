@@ -3,13 +3,14 @@
 ## 文書情報
 
 - 記録日時: 2026-07-26 21:50:36 JST
-- 最終更新日時: 2026-07-26 04:00 JST
+- 最終更新日時: 2026-07-27 04:41 JST（2026-07-26 19:41 UTC）
 - 対象リポジトリ: `https://github.com/MARUGO-s/sms-management.git`
 - 対象ブランチ: `main`
-- 作業開始時HEAD: `254ae115195425d8672983eb765240713aaebf4f`
+- 作業開始時HEAD: `cbf7d20c07b715c49a9bbc911343a1318fe72b0e`
 - ローカル作業場所: `/Users/yoshito/Documents/New project`
-- 本番URL: `https://instatic-talksx.yoshito0428.chatgpt.site`
-- 管理者URL: `https://instatic-talksx.yoshito0428.chatgpt.site/admin`
+- 本番URL: `https://marugo-s.github.io/sms-management/`
+- 管理者URL: `https://marugo-s.github.io/sms-management/admin/`
+- 旧OpenAI Sites URL: `https://instatic-talksx.yoshito0428.chatgpt.site`
 - Supabase project ref: `xpdrewhzisycjdtcvvey`
 - この文書には秘密値、個人メール、アクセストークンを記載しない。
 
@@ -34,23 +35,26 @@
 4. 問題や未完了事項を隠さず、再現条件と次の具体的な手順を残す。
 5. 以前の記録は原則として削除しない。誤りを訂正する場合は、訂正日時と理由を追記する。
 
-### コード調査の必須手順（絶対事項）
+### 知識・コード調査の必須手順（絶対事項）
 
-このプロジェクトにはGraphify（コード構成のナレッジグラフ）が導入済みである。コードを調べるときは、次を絶対事項として守る。
+このプロジェクトにはObsidian（永続知識）とGraphify（現在コードの構造グラフ）が導入済みである。調査・実装時は、次を絶対事項として守る。
 
-1. まずGraphifyでコードの場所と関係を特定してから読む。当てずっぽうの広範囲`grep`／`read`の連打を最初の手段にしない。
-2. 使うコマンドは作業ディレクトリ`/Users/yoshito/Documents/New project`で実行する。
+1. まず`npm run knowledge:search -- "<依頼・症状・機能名>"`で、設計意図・意思決定・運用・障害・機能知識をObsidianから検索する。会話コンテキストだけを過去知識として扱わない。
+2. `npm run knowledge:check`でGraphify、Web環境図、Obsidian AI workspace、秘密値ガードの整合性を確認する。
+3. 次にGraphifyでコードの場所と関係を特定してから読む。当てずっぽうの広範囲`grep`／`read`の連打を最初の手段にしない。
+4. 使うコマンドは作業ディレクトリ`/Users/yoshito/Documents/New project`で実行する。
    - `graphify query "<自然言語の質問>"` … 関連ノードを横断で特定
    - `graphify path "<A>" "<B>"` … 2ノード間の経路
    - `graphify explain "<関数名など>"` … そのノードの呼び出し元・呼び出し先
-3. Graphifyで当たりを付けた後は、該当ファイルの必要な箇所だけをピンポイントで読む。全体を無差別に`grep`しない。
-4. Graphifyの限界を理解して補完する。次はコード限定の静的グラフに載らないため、該当ファイルを直接確認する。
+5. Graphifyで当たりを付けた後は、該当ファイルの必要な箇所だけをピンポイントで読む。全体を無差別に`grep`しない。
+6. Graphifyの限界を理解して補完する。次はコード限定の静的グラフに載らないため、該当ファイルを直接確認する。
    - SQL migration / RLS / trigger（例: 管理者権限は`supabase/migrations/`のSQLに実装があり、queryでは出ない）
    - DB・HTTP・Cloud Runをまたぐ実行時フロー（UIからワーカーまでが1本の`path`として繋がらない）
    - CSS・`Dockerfile`・`config.toml`など分類対象外ファイル
-5. コード構成を変更したら、必ず`npm run graphify:system-map`でグラフと`public/system-map/`を最新化してからレビュー・デプロイする。古いグラフのまま調査・報告しない。
-6. `graphify update .`（watch版）はサンドボックス環境で`Operation not permitted`になることがある。その場合は`npm run graphify:system-map`（内部で`graphify extract . --code-only`＋`graphify cluster-only .`）で更新する。
-7. Graphifyの解析対象はコード構成に限定する。投稿本文、添付ファイル、Supabase本番データ、環境変数、SNS連携シークレットをGraphifyの入力にしない。
+7. コード構成を変更したら、必ず`npm run knowledge:update`でGraphify、管理画面マップ、環境図、Obsidian Graphifyノート、AI開始文書を一括更新する。古いグラフや環境図のまま調査・報告・デプロイしない。
+8. `graphify update .`（watch版）はサンドボックス環境で`Operation not permitted`になることがある。その場合は`npm run knowledge:update`を使用する。
+9. Graphifyの解析対象はコード構成に限定する。投稿本文、添付ファイル、Supabase本番データ、環境変数、SNS連携シークレットをGraphifyの入力にしない。
+10. 次回も必要な判断・運用・障害・機能知識は、作業終了前に該当する手書きObsidianノートへ書き戻す。`90_Graphify/`は自動生成領域なので手編集しない。
 
 ### 作業終了時
 
@@ -60,9 +64,11 @@
 2. この文書末尾の「継続作業ログ」へ新しい記録を追記する。
 3. 継続作業ログには、日時、依頼内容、実施内容、変更ファイル、DB・設定変更、テスト結果、デプロイ先、Git情報、未完了事項、次の作業を記載する。
 4. 秘密値、個人メール、アクセストークン、Client Secret、Sitesのバイパストークンは記載しない。
-5. コードとこの文書をGitへcommitし、明示された運用方針に従ってpushする。
-6. `/Users/yoshito/Library/CloudStorage/Dropbox/web/instatic-talksx/`へ、`.env*`などの除外規則を守ってソースを同期する。
-7. Dropbox側の`PROJECT_PROGRESS.md`がGit作業場所の内容と一致することを確認する。
+5. 関連する手書きObsidianノートを更新し、構造変更後は`npm run knowledge:update`、終了前は`npm run knowledge:check`を実行する。
+6. メディアワーカーを変更した場合は、Dockerが利用可能なら`npm run worker:docker:check`を実行する。他アプリの稼働中コンテナは停止・再作成しない。
+7. コードとこの文書をGitへcommitし、明示された運用方針に従ってpushする。
+8. `/Users/yoshito/Library/CloudStorage/Dropbox/web/instatic-talksx/`へ、`.env*`などの除外規則を守ってソースを同期する。
+9. Dropbox側の`PROJECT_PROGRESS.md`がGit作業場所の内容と一致することを確認する。
 
 この更新を行っていない作業は、コードが動いていても引き継ぎ未完了として扱う。次のAIは、前回作業の記録漏れを発見した場合、確認できる事実だけを追記してから新しい作業を始める。
 
@@ -92,7 +98,15 @@ Instatic TalksXは、Instagram、TikTok、X、Threadsの運用情報を一括管
 - 管理者画面からの管理者権限付与・解除
 - 最後の管理者を削除できないDB保護
 - 管理者権限変更を含む監査ログ
-- GitHub、Dropbox、Sitesへの引き継ぎ経路
+- GitHub Pagesへの静的デプロイとDropboxソースミラー
+- 管理者画面のGraphifyコード構成マップ
+- 管理者画面の実行環境・AI知識循環マップ
+- Dropbox同期のObsidian知識Vault（アプリ別、手書き知識と自動生成領域を分離）
+- AI向け`AGENTS.md`、`00_AI_START_HERE`、`knowledge:search`、`knowledge:check`
+- `npm run knowledge:update`によるGraphify・環境図・Obsidian・AI文書の一括同期
+- Docker DesktopによるCloud Run向けFFmpeg workerのローカル再現性検証
+
+知識環境の最新生成結果は326ノード、343関係、32コミュニティ。ObsidianのInstatic TalksX配下はMarkdown合計373件で、`90_Graphify/`はGraphify生成ノート358件 + 運用説明`_README.md` 1件 + `graph.canvas` + 生成manifestで構成される。`70_AI作業環境/`はAI入口・環境図・Canvas・チェックリスト・Graphify/Obsidianブリッジを含む8ファイル。
 
 現時点では実際のSNS公開処理、コメント・DM同期、Webhook受信、各SNSの分析値取得は未実装。各SNSの開発者アプリ審査、OAuth認可、公開API実装が別途必要。動画クロップの画面、キュー、Edge Function、FFmpegワーカーは実装済みで、Cloud Run実行環境も構築済み。2026-07-27 00:19 JST時点で9分16秒動画のジョブがアプリ上で処理中表示になっており、処理済みMP4への変換完了はまだ確認できていない。
 
@@ -175,13 +189,25 @@ Instatic TalksXは、Instagram、TikTok、X、Threadsの運用情報を一括管
 
 ### ホスティング
 
-- OpenAI Sites
-- Sites project ID: `appgprj_6a65e85b2c6c8191b197204738f2e23f`
-- `.openai/hosting.json`にproject IDを保存
-- アクセスモード: 所有者のみのカスタムアクセス
-- 最新Sitesバージョン: v9
-- v9のsource commit: `1a1a79b2f7477b57bb877362adc6228eac88e26f`
-- v9は所有者限定アクセスのまま本番公開済み
+- 現行本番: GitHub Pages `https://marugo-s.github.io/sms-management/`
+- `main`へのpushで`.github/workflows/deploy-github-pages.yml`が自動ビルド・公開
+- Vinextの静的exportと`/sms-management/` base pathに対応
+- GitHub Actions SecretsはSupabase publishable設定だけを保持し、secret/service role keyは置かない
+- OpenAI Sites project ID `appgprj_6a65e85b2c6c8191b197204738f2e23f`は旧配信経路として`.openai/hosting.json`に残るが、現行本番の正本はGitHub Pages
+
+### 知識・AI開発環境
+
+- 構成モデルの正本: `knowledge/system-architecture.json`
+- AI運用ルール: `AGENTS.md`、`AI_HANDOFF.md`、`PROJECT_PROGRESS.md`
+- AI向け生成文書: `docs/AI_CONTEXT.md`、`docs/AI_KNOWLEDGE_SYSTEM.md`
+- Web環境図: `public/system-map/environment.html`
+- Graphify統計: `public/system-map/graph-stats.json`
+- Obsidian Vault: `/Users/yoshito/Library/CloudStorage/Dropbox/web/アプリ知識`
+- Instatic TalksX AI入口: `10_アプリ別/Instatic TalksX/70_AI作業環境/00_AI_START_HERE.md`
+- 自動Graphifyノート: `10_アプリ別/Instatic TalksX/90_Graphify/`
+- 手書き知識検索: `npm run knowledge:search -- "<依頼・症状・機能名>"`
+- 一括更新: `npm run knowledge:update`
+- 整合性検査: `npm run knowledge:check`
 
 ## 通常画面の機能
 
@@ -561,32 +587,11 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
 
 ## Gitの状態
 
-店舗所属・予約予定機能の実装反映時点:
-
 - ブランチ: `main`
-- 実装commit: `ed6ecf98e37ebd3d5096f3c71f6f1716a02bde54`
-- 実装commitはGitHub `origin/main`へpush済み
+- 本作業開始時HEAD: `cbf7d20c07b715c49a9bbc911343a1318fe72b0e`
 - Remote: `origin`
 - Remote URL: `https://github.com/MARUGO-s/sms-management.git`
-
-直近のコミット:
-
-| Commit | 日時 | 内容 |
-| --- | --- | --- |
-| `ed6ecf9` | 2026-07-26 22:28 JST | Add store-scoped social operations |
-| `c7f462e` | 2026-07-26 21:57 JST | Record completed handoff synchronization |
-| `356f127` | 2026-07-26 21:55 JST | Require continuous AI handoff records |
-| `62fc116` | 2026-07-26 21:51 JST | Add detailed project progress record |
-| `04b3451` | 2026-07-26 21:45 JST | Manage administrators from admin console |
-| `06be302` | 2026-07-26 21:38 JST | Document Dropbox secret handoff |
-| `c86dece` | 2026-07-26 21:31 JST | Add administrator operations console |
-| `db7f506` | 2026-07-26 21:07 JST | Show authenticated storage access state |
-| `e219e84` | 2026-07-26 21:02 JST | Keep existing password sign-ins compatible |
-| `1f56eec` | 2026-07-26 20:58 JST | Add Google authentication flow |
-| `0998b66` | 2026-07-26 20:21 JST | Fix authenticated workspace loading |
-| `4ac36e8` | 2026-07-26 20:10 JST | Document production deployment handoff |
-
-この進行記録を追加するとHEADは変わるため、次回はこの文書の記録時HEADと現在HEADを比較すること。
+- 本作業のcommit・push・GitHub Pages公開結果は、この文書末尾の継続作業ログへ追記する。
 
 ## Dropbox
 
@@ -596,9 +601,7 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
 
 `/Users/yoshito/Library/CloudStorage/Dropbox/web/instatic-talksx/`
 
-この文書を同期する直前のファイル数: 60
-
-この文書を含めた同期後の想定ファイル数: 61
+固定ファイル数は構成変更で変動するため正本としない。同期後は`git ls-files`の各ファイルがミラー側と一致することを検査する。
 
 含むもの:
 
@@ -691,7 +694,13 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
 - `npm run lint`
 - `npm test`
 - `npm run build`
+- `npm run build:github-pages`
 - `node --test tests/rendered-html.test.mjs`
+- `node --test tests/knowledge-system.test.mjs`
+- `npm run knowledge:update`
+- `npm run knowledge:check`
+- `npm run knowledge:search -- "動画クロップ"`
+- `npm run worker:docker:check`
 - `git diff --check`
 
 結果:
@@ -703,7 +712,12 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
 - 新規登録画面の店舗選択肢がプレースホルダーを含む24件で、23店舗すべてを含むことを確認
 - `BLU NERO`が登録選択肢とDB店舗マスターに存在
 - スタータープレビューが残っていないことを確認
-- ESLint error 0
+- Graphify・Obsidian・AI環境モデルのノードID、接続、生成物を専用テストで確認
+- Graphify manifestのハッシュと生成統計が最新であることを確認
+- Obsidian AI workspace、Graphify Canvas、秘密値マーカー検査が成功
+- GitHub Pages向け静的export成功
+- Dockerイメージbuild、Node、FFmpeg、libx264、非root実行、crop-planテスト成功
+- ESLint error 0、既存warning 1
 
 ### 実画面
 
@@ -727,6 +741,11 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
 - デスクトップ表示を確認
 - 390 x 844のモバイル表示を確認
 - 表はモバイルで横スクロールし、画面全体を押し広げない
+- ローカル環境図を1440 x 1000デスクトップで確認
+- ローカル環境図を390 x 844モバイルで確認（大きな図は横スクロール）
+- `#knowledge`でAI・Graphify・Obsidian知識循環図を直接表示できることを確認
+- 実行環境図にGitHub Pages、Supabase、Edge Functions、Cloud Run、Secret Manager、Artifact Registry、Docker検証、Dropboxミラーを表示
+- Obsidianアプリで`アプリ知識` Vaultと`00_AI_START_HERE`を実際に開き、開始手順・環境図・ブリッジへの導線を確認
 
 ## 既知の警告と環境上の注意
 
@@ -743,19 +762,18 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
 
 ### Docker
 
-- Docker Desktopは記録時に起動していない
-- `supabase db push --linked`のマイグレーション適用自体は成功
-- 適用後のローカルmigration catalog cache生成だけがDocker未起動警告を出す
-- FFmpegワーカーの計算テストは成功したが、コンテナimage buildはDocker未起動のため未実行
-- ローカルSupabase stackを起動する場合はDocker Desktopが必要
+- Docker Desktop 28.4.0が起動済み
+- 別アプリのSupabaseコンテナ群が稼働しているため、停止・再作成・設定変更を行わない
+- Instatic TalksXは`instatic-talksx-media-processor:local`の独立イメージだけを使用
+- `npm run worker:docker:check`でDockerfile build、Node 22、FFmpeg 5.1.9、libx264、非rootユーザー、crop-plan 2テストを確認済み
+- Docker Desktopを再起動・停止する必要がある場合は、このセッションへ影響し得るため利用者が手動で行う
 
 ### Cloud Run
 
+- GCP project、Artifact Registry、runtime/dispatcher service account、Secret Manager、Cloud Run Job、Supabase Edge Function Secretsは構築済み
 - ワーカー実装とデプロイ手順は`workers/media-processor/`にある
-- GCPプロジェクト、課金設定、Artifact Registry、実行用service accountは未選定・未作成
-- Supabase側のGoogleシークレットも未設定
-- Cloud Run接続前でも予約投稿、元動画、クロップ設定、処理待ち履歴はSupabase Freeへ保存される
-- 実際のFFmpeg処理完了まではCloud Run接続が必要
+- 既存GCP資源・Secret・service accountを再作成しない
+- 9分16秒動画の処理済みMP4ダウンロード・再生確認だけが未完了
 
 ### ローカル開発サーバー
 
@@ -794,7 +812,6 @@ Supabase Advisorsは`Leaked Password Protection Disabled`を1件報告してい�
 
 ### 運用
 
-- Cloud Run JobのGCP本番接続
 - 定期実行ワーカー
 - 予約時刻になった投稿の自動公開
 - Dropboxバックアップの自動実行
@@ -1091,3 +1108,25 @@ supabase functions deploy media-jobs --use-api
 - デプロイ: commit後に`main`へpushし、GitHub ActionsでGitHub Pagesへ公開する。OpenAI Sitesは変更しない。
 - Dropbox: ソースミラーとObsidian Vaultは別フォルダ。ソースミラーには`.env.local`と`.git`を含めない。VaultはDropbox同期完了後に別PCで同じフォルダをObsidian Vaultとして開く。
 - 次の作業: 別のアプリを追加する場合は`10_アプリ別/<アプリ名>/`を作り、そのアプリ固有のGraphify出力先を設定する。2台で同じノートを同時編集しない。
+
+### 2026-07-27 04:41 JST（2026-07-26 19:41 UTC）- Graphify・Obsidian・AI・Dockerを統合した開発知識環境を構築
+
+- 依頼: GraphifyとObsidianを十分に連携させ、アプリ開発に役立つシステム構成をまとめ、AI自身が両方を活用できる環境図を作る。利用可能になったDockerも必要箇所で使用する。
+- 設計: Graphifyを「現在コードの場所・関係・経路」、Obsidianを「設計意図・意思決定・運用・障害・機能知識」、Git作業コピーを「実装とテストの正本」、AIを「検索・構造探索・精読・実装・検証・書き戻しを循環させる主体」と定義した。会話コンテキストは永続記憶として扱わない。
+- AI作業フロー: `knowledge:search`で手書きObsidian知識を検索 → `knowledge:check`で整合性確認 → Graphify query/path/explainで該当コードを特定 → 必要箇所だけ精読 → 実装/検証 → 手書きObsidianノートと`PROJECT_PROGRESS.md`へ書き戻し → 構造変更後に`knowledge:update`。
+- 構成モデル: `knowledge/system-architecture.json`を環境構成の正本とし、`scripts/generate-knowledge-system.mjs`からWeb環境図、Graphify統計、AI向けMarkdown、Obsidian Markdown、Obsidian Canvasを同時生成することで内容ずれを防止。
+- AI入口: ルート`AGENTS.md`を追加。Obsidianへ`70_AI作業環境/00_AI_START_HERE.md`、実行環境図、AI知識循環図、情報源優先順位、作業チェックリスト、Graphify/Obsidianブリッジ、Canvas 2件を生成。Obsidianアプリ上で`00_AI_START_HERE`を実際に開き内容を確認した。
+- Graphify/Obsidianブリッジ: 主要機能について手書きノートとGraphifyノードを相互リンク。`npm run knowledge:search -- "<依頼・症状・機能名>"`を追加し、通常は自動生成`90_Graphify/`を除外して設計・運用・障害・機能知識を検索できるようにした。
+- 管理画面: `/admin`のシステムマップを「コード構成」と「実行環境・AI知識循環」の切替表示へ拡張。Graphify統計は`public/system-map/graph-stats.json`から取得し、ノード数等の固定値陳腐化を防止。環境図は`#runtime` / `#knowledge`で直接表示可能。
+- 環境図: GitHub Repository/Actions/Pages、ブラウザUI、Supabase Auth/Postgres RLS/Storage、integration-secrets/media-jobs Edge Functions、Artifact Registry、Cloud Run Job、Secret Manager、Dropbox source mirror、Docker Desktop検証を実行環境図へ記載。AI入口、Graphify CLI/graphify-out、Git作業コピー、必要箇所精読、実装/テスト/デプロイ、Obsidian Vault、90_Graphify、knowledge:update/search、Dropbox同期を知識循環図へ記載。
+- 自動化: `npm run knowledge:update`をGraphify更新、Obsidian export、環境図・AI文書生成、整合性/秘密値検査まで行う処理へ強化。`npm run knowledge:check`、`knowledge:generate`、`knowledge:search`を追加。`.graphifyignore`で生成物・docs・knowledgeモデルをGraphify再解析から除外。
+- Docker: 起動済みDocker Desktop 28.4.0を確認。既存の別アプリ用Supabaseコンテナ群を停止・変更せず、`instatic-talksx-media-processor:local`だけを独立build。`npm run worker:docker:check`を追加し、Node 22.23.1、FFmpeg 5.1.9、libx264、非root nodeユーザー、crop-plan 2テスト成功を確認。
+- Graphify結果: 326ノード、343関係、32コミュニティ。Obsidian `90_Graphify/`はGraphify生成ノート358件、運用説明`_README.md`、`graph.canvas`、生成manifestで構成。Graphify manifest hash、Web生成物、Obsidian AI workspace、Canvas、秘密値マーカー検査はすべて成功。
+- 実画面: ローカル環境図を1440 x 1000と390 x 844で確認。デスクトップは全体構成を表示し、モバイルは統計を2列化、タブを横スクロール、大型図を横スクロールで閲覧できる。`#knowledge`でAI知識循環図を直接表示できることを画像確認した。
+- 変更ファイル: `AGENTS.md`、`.graphifyignore`、`knowledge/system-architecture.json`、`docs/AI_CONTEXT.md`、`docs/AI_KNOWLEDGE_SYSTEM.md`、`scripts/generate-knowledge-system.mjs`、`scripts/check-knowledge-system.mjs`、`scripts/search-knowledge-vault.mjs`、`scripts/check-media-worker-docker.sh`、`scripts/update-knowledge-vault.sh`、`package.json`、管理画面/CSS、公開system-map生成物、テスト、README、AI handoff、進行記録。Obsidian側はDropbox同期対象でGit外。
+- DB・設定変更: Supabase DB migration、Edge Function本番、Cloud Run本番、Google Cloud IAM/Secret、SNS API設定の変更なし。既存Dockerコンテナの停止・再作成なし。
+- テスト: `npm run knowledge:update`成功、`npm run knowledge:check`成功、`npm run lint`はerror 0・既存warning 1、`npm test`は9件すべてpass、`npm run build:github-pages`成功、`npm run worker:docker:check`成功。`knowledge:search`で動画クロップ、管理者権限、Docker/Cloud Run知識が手書きノートから取得できることを確認。
+- デプロイ: 本作業commitを`main`へpush後、GitHub ActionsのPagesデプロイ成功と公開URLの`environment.html`、`graph.html`、`graph-stats.json`、管理画面導線を確認する。OpenAI Sites、Supabase、Cloud Run本番は変更しない。
+- Dropbox: commit後にGit管理ツリーを`instatic-talksx`ソースミラーへ同期し、`.git`と`.env*`を含めない。Obsidian Vaultは`アプリ知識`で独立同期し、同じノートを複数PCで同時編集しない。
+- 未完了事項: 認証済み本番`/admin`でシステムマップの2表示を切り替える最終操作確認。本番データに関する既存未完了（9分16秒動画の変換済みMP4再生確認、SNS実連携）は継続。
+- 次の作業: GitHub Pages公開確認後、次の開発依頼からこの知識フローを実運用する。別アプリをVaultへ追加する際は、アプリ固有の`70_AI作業環境/`、`90_Graphify/`、構成モデル、更新/検査/検索コマンドを同じ設計で用意する。

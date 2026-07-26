@@ -57,15 +57,26 @@ https://marugo-s.github.io/sms-management/**
 
 ## System map
 
-`/admin` の「システムマップ」は、Graphifyで生成したアプリのコード構成図です。利用者の投稿本文、添付ファイル、Supabaseデータ、環境変数、SNS連携シークレットは解析・表示しません。
+`/admin` の「システムマップ」は2つの表示を切り替えられます。
 
-アプリ構成を変更した後だけ、Graphify CLIが入った開発環境で更新します。
+- **コード構成**: Graphifyがコードから生成した関数・ファイル・依存関係のグラフ。
+- **実行環境・AI知識循環**: ブラウザ、Supabase、Cloud Run、GitHub Pagesに加え、AI・Graphify・Obsidianの探索／実装／知識保存フロー。
+
+利用者の投稿本文、添付ファイル、Supabase本番データ、環境変数、SNS連携シークレットは解析・表示しません。
+
+コード構成だけを更新する場合:
 
 ```bash
 npm run graphify:system-map
 ```
 
-このコマンドはローカルの`graphify-out/`に作業用出力を生成し、公開用の`public/system-map/graph.html`だけを更新します。`graphify-out/`はGit・Dropboxソースミラーに保存しません。
+Graphify・環境図・Obsidian・AIコンテキストをまとめて更新する場合:
+
+```bash
+npm run knowledge:update
+```
+
+`graphify-out/`はローカルの作業用出力で、Git・Dropboxソースミラーに保存しません。
 
 ## Obsidian knowledge vault
 
@@ -83,17 +94,34 @@ npm run graphify:system-map
 │       ├── 40_意思決定/
 │       ├── 50_障害と対応/
 │       ├── 60_機能別知識/
+│       ├── 70_AI作業環境/
 │       └── 90_Graphify/
 └── 90_共通知識/
 ```
 
-コード構成を変更した後は、次の1コマンドで管理画面用システムマップとObsidianのGraphifyノートを更新します。
+AIと開発者は、まず手書きObsidian知識を検索し、次にGraphifyでコード構造を絞ります。
+
+```bash
+npm run knowledge:search -- "<依頼・症状・機能名>"
+graphify query "<コード上で知りたいこと>"
+```
+
+コード構成を変更した後は、次の1コマンドで管理画面マップ、環境図、Graphifyノート、AI開始文書を更新します。
 
 ```bash
 npm run knowledge:update
+npm run knowledge:check
 ```
 
-別PCでVaultの場所が異なる場合は、`KNOWLEDGE_VAULT_GRAPHIFY_DIR`にそのPCの`90_Graphify`フォルダを指定します。`90_Graphify/`は自動生成領域なので手編集しません。Vaultへ`.env`、秘密鍵、service role key、SNSトークン、本番個人データ、投稿本文、添付ファイルを保存しないでください。
+別PCでVaultの場所が異なる場合は、`KNOWLEDGE_VAULT_APP_DIR`にアプリフォルダ、または`KNOWLEDGE_VAULT_GRAPHIFY_DIR`に`90_Graphify`を指定します。`70_AI作業環境/`にはAIの入口・環境図・チェックリスト、`90_Graphify/`には自動生成のコードノートがあります。Vaultへ`.env`、秘密鍵、service role key、SNSトークン、本番個人データ、投稿本文、添付ファイルを保存しないでください。
+
+Cloud Run向けメディアワーカーはDocker Desktopでローカル検証できます。
+
+```bash
+npm run worker:docker:check
+```
+
+このコマンドはイメージbuild、Node・FFmpeg・libx264・非root実行、crop-planテストを確認します。Docker Desktopで他アプリのSupabaseコンテナが動作している場合、それらを停止・再作成せず、Instatic TalksXのワーカーイメージだけを独立して検証します。
 
 ## Supabase
 

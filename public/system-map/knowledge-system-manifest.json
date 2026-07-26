@@ -1,0 +1,20 @@
+{
+  "generatedAt": "2026-07-26T19:47:23.131Z",
+  "architectureHash": "f6cdf7a7de2089a577ea245ea7977b3b3efcbf799d3c6b8afe91c04e3df8818c",
+  "graph": {
+    "nodes": 326,
+    "edges": 343,
+    "communities": 32,
+    "builtAtCommit": "cbf7d20c07b715c49a9bbc911343a1318fe72b0e"
+  },
+  "outputs": [
+    "public/system-map/environment.html",
+    "public/system-map/graph-stats.json",
+    "docs/AI_CONTEXT.md",
+    "docs/AI_KNOWLEDGE_SYSTEM.md",
+    "Obsidian:70_AI作業環境/00_AI_START_HERE.md",
+    "Obsidian:70_AI作業環境/05_Graphify_Obsidianブリッジ.md",
+    "Obsidian:70_AI作業環境/runtime-system.canvas",
+    "Obsidian:70_AI作業環境/ai-knowledge-loop.canvas"
+  ]
+}

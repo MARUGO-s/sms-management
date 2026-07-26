@@ -35,6 +35,14 @@ type AdminView =
   | "system";
 type AccessState = "checking" | "granted" | "denied";
 type PostStatus = "draft" | "scheduled" | "published" | "failed";
+type SystemMapMode = "graph" | "environment";
+
+type SystemMapStats = {
+  nodes: number;
+  edges: number;
+  communities: number;
+  generatedAt: string;
+};
 
 type UserProfileRow = {
   user_id: string;
@@ -197,6 +205,10 @@ export default function AdminConsole() {
   const [files, setFiles] = useState<FileRow[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditRow[]>([]);
   const [integrations, setIntegrations] = useState<IntegrationRow[]>([]);
+  const [systemMapMode, setSystemMapMode] =
+    useState<SystemMapMode>("graph");
+  const [systemMapStats, setSystemMapStats] =
+    useState<SystemMapStats | null | false>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -219,6 +231,18 @@ export default function AdminConsole() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (activeView !== "system" || systemMapStats !== null) return;
+
+    void fetch(appPath("/system-map/graph-stats.json"))
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Graph stats could not be loaded");
+        return response.json() as Promise<SystemMapStats>;
+      })
+      .then(setSystemMapStats)
+      .catch(() => setSystemMapStats(false));
+  }, [activeView, systemMapStats]);
 
   const profileById = useMemo(
     () => new Map(profiles.map((profile) => [profile.user_id, profile])),
@@ -1209,12 +1233,16 @@ export default function AdminConsole() {
           <section className="admin-system-map" aria-label="システムマップ">
             <div className="admin-system-map-heading">
               <div>
-                <p className="eyebrow">Graphify</p>
+                <p className="eyebrow">Graphify × Obsidian × AI</p>
                 <h3>システムマップ</h3>
               </div>
               <a
                 className="admin-system-map-link"
-                href={appPath("/system-map/graph.html")}
+                href={appPath(
+                  systemMapMode === "graph"
+                    ? "/system-map/graph.html"
+                    : "/system-map/environment.html",
+                )}
                 rel="noreferrer"
                 target="_blank"
               >
@@ -1222,15 +1250,56 @@ export default function AdminConsole() {
                 <span>別画面で開く</span>
               </a>
             </div>
+            <div className="admin-system-map-switcher" role="tablist">
+              <button
+                aria-selected={systemMapMode === "graph"}
+                className={systemMapMode === "graph" ? "active" : ""}
+                onClick={() => setSystemMapMode("graph")}
+                role="tab"
+                type="button"
+              >
+                コード構成
+              </button>
+              <button
+                aria-selected={systemMapMode === "environment"}
+                className={systemMapMode === "environment" ? "active" : ""}
+                onClick={() => setSystemMapMode("environment")}
+                role="tab"
+                type="button"
+              >
+                実行環境・AI知識循環
+              </button>
+            </div>
             <div className="admin-system-map-stats" aria-label="グラフ情報">
-              <span>254 ノード</span>
-              <span>269 関係</span>
-              <span>コードのみ</span>
+              {systemMapStats ? (
+                <>
+                  <span>{systemMapStats.nodes} ノード</span>
+                  <span>{systemMapStats.edges} 関係</span>
+                  <span>{systemMapStats.communities} コミュニティ</span>
+                </>
+              ) : systemMapStats === false ? (
+                <span>グラフ情報を取得できませんでした</span>
+              ) : (
+                <span>グラフ情報を読み込み中</span>
+              )}
+              <span>
+                {systemMapMode === "graph"
+                  ? "Graphify・コードのみ"
+                  : "Graphify × Obsidian × AI"}
+              </span>
             </div>
             <iframe
               className="admin-system-map-frame"
-              src={appPath("/system-map/graph.html")}
-              title="Instatic TalksX システムマップ"
+              src={appPath(
+                systemMapMode === "graph"
+                  ? "/system-map/graph.html"
+                  : "/system-map/environment.html",
+              )}
+              title={
+                systemMapMode === "graph"
+                  ? "Instatic TalksX コード構成マップ"
+                  : "Instatic TalksX 実行環境とAI知識循環"
+              }
             />
           </section>
         )}

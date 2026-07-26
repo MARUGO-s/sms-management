@@ -143,9 +143,9 @@ Supabase Dashboard > Authentication > URL Configuration must include `https://ma
 
 ## Graphify system map
 
-The administrator console includes a `システムマップ` view backed by the static asset `public/system-map/graph.html`. It is a Graphify code-only architecture map, not a graph of production SNS posts, files, users, Supabase rows, or secrets. The current graph was generated with `graphify extract . --code-only --out .` and has 267 nodes, 284 relationships, and 27 communities.
+The administrator console includes a `システムマップ` view with two generated surfaces: `public/system-map/graph.html` for the Graphify code graph and `public/system-map/environment.html` for the runtime plus AI/Graphify/Obsidian knowledge loop. The current graph statistics are generated into `public/system-map/graph-stats.json`; do not hardcode counts in the UI.
 
-To refresh it after intentional code structure changes, run `npm run graphify:system-map` on a development machine where the Graphify CLI is installed. The script regenerates `graphify-out/` locally, then copies the reviewed `graph.html` and `GRAPH_REPORT.md` into `public/system-map/`. `graphify-out/` is deliberately ignored by Git and must not be added to the Dropbox source mirror. Keep this code-only boundary; do not add environment files, runtime secrets, user uploads, post content, or database exports to Graphify input without an explicit security design review.
+After intentional code structure changes, run `npm run knowledge:update`. It refreshes Graphify, the admin map, the environment diagram, the Obsidian Graphify export, AI entry notes, and consistency checks. Use `npm run knowledge:check` before closure. `graphify-out/` is deliberately ignored by Git and must not be added to the Dropbox source mirror. Keep this code-only boundary; do not add environment files, runtime secrets, user uploads, post content, or database exports to Graphify input.
 
 This integration was deployed as Sites v11 from source commit `827d5ddf03a7e6e4699dfd69cf949b813df012d0`. The Graphify static asset is suitable for architecture review only; it does not replace the existing Supabase RLS, Cloud Run processing, or admin authorization paths.
 
@@ -154,12 +154,13 @@ This integration was deployed as Sites v11 from source commit `827d5ddf03a7e6e46
 This is an absolute operating rule for every AI and developer working on this repository.
 
 - Before broad `grep` or repeated file reads, use the existing Graphify graph to identify the relevant nodes, files, and relationships.
+- Search durable manual knowledge first with `npm run knowledge:search -- "<task or topic>"`; then use Graphify for the current code structure.
 - Run Graphify from `/Users/yoshito/Documents/New project`.
 - Use `graphify query "<question>"` for cross-code discovery, `graphify path "<A>" "<B>"` for a connection trace, and `graphify explain "<node>"` for callers and callees.
 - After Graphify identifies the likely implementation, read only the required source ranges. Do not begin with blind repository-wide `grep`/`read` loops.
 - Graphify is a structural map, not a substitute for source verification. Read the relevant files directly when editing code or checking exact behavior.
 - SQL migrations, RLS policies, triggers, CSS, Docker/config files, and runtime links across Supabase, HTTP, Edge Functions, and Cloud Run may not appear as connected Graphify nodes. Inspect those specific files directly when they are part of the task.
-- After intentional code-structure changes, run `npm run graphify:system-map` before review and deployment. Do not investigate or report from a stale graph.
+- After intentional code-structure changes, run `npm run knowledge:update` before review and deployment. Do not investigate or report from a stale graph.
 - If `graphify update .` fails with a sandbox watcher permission error, use `npm run graphify:system-map`, which performs the safe code-only extract and clustering flow.
 - Keep Graphify code-only. Never add environment files, secrets, user posts, uploaded files, production database exports, or SNS credentials to its input.
 
@@ -169,11 +170,14 @@ Durable project knowledge is kept in an Obsidian vault stored in Dropbox and syn
 
 - Vault root: `/Users/yoshito/Library/CloudStorage/Dropbox/web/アプリ知識`
 - Per-app layout: `10_アプリ別/<app>/` (this app: `10_アプリ別/Instatic TalksX/`), with `00_HOME.md` and numbered folders for overview, design, operations, decisions, incidents, and feature knowledge.
+- `70_AI作業環境/00_AI_START_HERE.md` is the AI entry point. It includes runtime and knowledge-loop diagrams, source priority, a work checklist, and a Graphify-to-manual-knowledge bridge.
 - `90_Graphify/` inside each app folder is auto-generated Obsidian notes plus `graph.canvas`. Do not edit it by hand.
-- Update from the working directory with `npm run knowledge:update` (`scripts/update-knowledge-vault.sh`): it refreshes the admin system map and regenerates the vault's `90_Graphify/` notes, then scans the output for secret markers.
-- Override the output folder with `KNOWLEDGE_VAULT_GRAPHIFY_DIR` if the vault path differs on another machine.
+- Use `npm run knowledge:search -- "<topic>"` to search manual Obsidian notes without loading the entire vault into AI context.
+- Update from the working directory with `npm run knowledge:update`; verify with `npm run knowledge:check`.
+- Override the app folder with `KNOWLEDGE_VAULT_APP_DIR`, or only the Graphify output with `KNOWLEDGE_VAULT_GRAPHIFY_DIR`, if paths differ on another machine.
 - Vault is code-and-docs knowledge only: never store `.env`, secret keys, service role keys, SNS tokens, production personal data, post bodies, or uploaded files in it.
 - Dropbox syncs the vault between desktop PCs. Do not edit the same note on two machines at once; let sync finish first. Mobile sync via Dropbox is unreliable; use Obsidian Sync if mobile is needed.
+- Docker Desktop can be used to build and test `workers/media-processor/` locally before Cloud Run deployment. Run `npm run worker:docker:check`; it verifies Node, FFmpeg, libx264, non-root runtime, and crop-plan tests. Keep this isolated: do not stop, recreate, or modify unrelated running Supabase containers.
 
 ## Production site access
 
