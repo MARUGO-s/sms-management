@@ -1015,3 +1015,13 @@ supabase functions deploy media-jobs --use-api
 - 検証: `npm test`は7件すべて成功、`git diff --check`成功。ローカルで`/admin`の既存管理者ログイン制限を確認し、`/system-map/graph.html`が254ノード・269関係のインタラクティブグラフとして描画されることを確認。公開対象の秘密値スキャンで新規の秘密値混入なし。
 - デプロイ: Sites v11を所有者限定アクセスのまま本番公開。URLは`https://instatic-talksx.yoshito0428.chatgpt.site`、source commitは`827d5ddf03a7e6e4699dfd69cf949b813df012d0`。Supabase DB・Edge Function、Cloud Run、Google Cloudの変更なし。
 - 次の作業: コード構成を大きく変更した時だけ`npm run graphify:system-map`を実行し、生成された公開用マップをレビューしてから本番へデプロイする。Graphifyを実データ処理に使う場合は、別途Supabase RLS・Storage・Cloud Runを含む設計を行う。
+
+### 2026-07-27 01:56 JST - 本番サイトのChatGPT認証ゲートを解除
+
+- 依頼: GitHub Pagesから本番URLへ転送された際にChatGPT認証画面が出る状態を、通常の本番運用として利用できるようにする。
+- 実施内容: OpenAI Sitesのアクセス設定を`public`へ変更し、既存ソースをSites v12として再公開した。GitHub Pagesの`index.html`による転送先は変更していない。
+- 検証: 本番URLへの未認証HTTPアクセスが`200`となり、HTMLのタイトルが`Instatic TalksX`であることを確認。以前の`Sign in required` / ChatGPT認証ゲートは返らない。
+- セキュリティ: 公開されるのはアプリのログイン画面まで。業務データ、ファイル、管理画面、SNS連携情報は引き続きSupabase AuthとRLSで保護され、Supabaseの秘密キーやSNSキーはブラウザへ公開していない。
+- デプロイ: Sites v12、source commit `93f90337cfafe1b48228117b426815ab9a70a3f4`、本番URL `https://instatic-talksx.yoshito0428.chatgpt.site`。
+- DB・設定変更: Sitesのアクセス設定以外に、Supabase migration、Edge Function、Cloud Run、Google Cloud、SNS APIの変更なし。
+- 次の作業: ブラウザで`https://marugo-s.github.io/sms-management/`を再読み込みし、ChatGPT認証画面なしでアプリのSupabaseログイン画面が開くことを確認する。GitHub Pagesをアプリ実行環境としては扱わない。

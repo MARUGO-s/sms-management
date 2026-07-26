@@ -137,3 +137,7 @@ The administrator console includes a `システムマップ` view backed by the 
 To refresh it after intentional code structure changes, run `npm run graphify:system-map` on a development machine where the Graphify CLI is installed. The script regenerates `graphify-out/` locally, then copies the reviewed `graph.html` and `GRAPH_REPORT.md` into `public/system-map/`. `graphify-out/` is deliberately ignored by Git and must not be added to the Dropbox source mirror. Keep this code-only boundary; do not add environment files, runtime secrets, user uploads, post content, or database exports to Graphify input without an explicit security design review.
 
 This integration was deployed as Sites v11 from source commit `827d5ddf03a7e6e4699dfd69cf949b813df012d0`. The Graphify static asset is suitable for architecture review only; it does not replace the existing Supabase RLS, Cloud Run processing, or admin authorization paths.
+
+## Production site access
+
+The production Sites project is now configured as `public` and was re-published as Sites v12 from source commit `93f90337cfafe1b48228117b426815ab9a70a3f4`. This removed the ChatGPT sign-in gate that appeared after the GitHub Pages redirect. An unauthenticated request to `https://instatic-talksx.yoshito0428.chatgpt.site` now returns the Instatic TalksX application (`HTTP 200`), whose data access remains protected by Supabase Auth and RLS. Do not re-enable owner-only Sites access unless the owner explicitly asks for a ChatGPT-gated internal preview.
