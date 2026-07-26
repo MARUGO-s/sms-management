@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 async function render(path = "/") {
@@ -49,4 +49,26 @@ test("starter preview files are not part of the finished site", async () => {
   await assert.rejects(
     access(new URL("../app/_sites-preview", import.meta.url)),
   );
+});
+
+test("store affiliation and administrator schedules remain wired into the app", async () => {
+  const [consoleSource, adminSource, migrationSource] = await Promise.all([
+    readFile(new URL("../app/social-console.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/admin/admin-console.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL(
+        "../supabase/migrations/20260726130739_add_social_store_affiliation.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(consoleSource, /所属店舗/);
+  assert.match(consoleSource, /social_store_id/);
+  assert.match(adminSource, /予約予定/);
+  assert.match(adminSource, /店舗別運用状況/);
+  assert.match(adminSource, /全店舗/);
+  assert.match(migrationSource, /create table public\.social_stores/);
+  assert.match(migrationSource, /'BLU NERO'/);
 });

@@ -6,6 +6,8 @@ import Link from "next/link";
 import {
   Activity,
   ArrowLeft,
+  Building2,
+  CalendarDays,
   CheckCircle2,
   Download,
   FileText,
@@ -22,15 +24,24 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 
-type AdminView = "posts" | "files" | "activity" | "users";
+type AdminView = "posts" | "schedule" | "files" | "activity" | "users";
 type AccessState = "checking" | "granted" | "denied";
 type PostStatus = "draft" | "scheduled" | "published" | "failed";
 
 type UserProfileRow = {
   user_id: string;
   email: string;
+  store_id: string | null;
   created_at: string;
   last_sign_in_at: string | null;
+};
+
+type StoreRow = {
+  id: string;
+  name: string;
+  area: string;
+  sort_order: number;
+  is_active: boolean;
 };
 
 type AdminUserRow = {
@@ -41,14 +52,9 @@ type AdminUserRow = {
 type WorkspaceRow = {
   id: string;
   name: string;
+  store_id: string | null;
   created_by: string;
   created_at: string;
-};
-
-type MembershipRow = {
-  workspace_id: string;
-  user_id: string;
-  role: string;
 };
 
 type PostRow = {
@@ -97,6 +103,7 @@ type IntegrationRow = {
 
 const adminViews = [
   { id: "posts" as const, label: "投稿", icon: FileText },
+  { id: "schedule" as const, label: "予約予定", icon: CalendarDays },
   { id: "files" as const, label: "ファイル", icon: FolderOpen },
   { id: "activity" as const, label: "操作履歴", icon: Activity },
   { id: "users" as const, label: "利用者", icon: Users },
@@ -168,14 +175,15 @@ export default function AdminConsole() {
   const [updatingAdminId, setUpdatingAdminId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | PostStatus>("all");
+  const [storeFilter, setStoreFilter] = useState<"all" | string>("all");
   const [notice, setNotice] = useState<{
     tone: "success" | "error";
     text: string;
   } | null>(null);
   const [profiles, setProfiles] = useState<UserProfileRow[]>([]);
   const [adminUsers, setAdminUsers] = useState<AdminUserRow[]>([]);
+  const [stores, setStores] = useState<StoreRow[]>([]);
   const [workspaces, setWorkspaces] = useState<WorkspaceRow[]>([]);
-  const [memberships, setMemberships] = useState<MembershipRow[]>([]);
   const [posts, setPosts] = useState<PostRow[]>([]);
   const [files, setFiles] = useState<FileRow[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditRow[]>([]);
@@ -207,9 +215,12 @@ export default function AdminConsole() {
     () => new Map(profiles.map((profile) => [profile.user_id, profile])),
     [profiles],
   );
-  const workspaceById = useMemo(
-    () =>
-      new Map(workspaces.map((workspace) => [workspace.id, workspace.name])),
+  const storeById = useMemo(
+    () => new Map(stores.map((store) => [store.id, store])),
+    [stores],
+  );
+  const workspaceRecordById = useMemo(
+    () => new Map(workspaces.map((workspace) => [workspace.id, workspace])),
     [workspaces],
   );
   const postById = useMemo(
@@ -218,19 +229,25 @@ export default function AdminConsole() {
   );
 
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase("ja");
-  const filteredPosts = useMemo(
+  const storeScopedPosts = useMemo(
     () =>
       posts.filter((post) => {
-        if (statusFilter !== "all" && post.status !== statusFilter) {
+        const workspace = workspaceRecordById.get(post.workspace_id);
+        if (
+          storeFilter !== "all" &&
+          workspace?.store_id !== storeFilter
+        ) {
           return false;
         }
         if (!normalizedQuery) return true;
         const owner = profileById.get(post.created_by)?.email ?? "";
-        const workspace = workspaceById.get(post.workspace_id) ?? "";
+        const store = workspace?.store_id
+          ? storeById.get(workspace.store_id)?.name ?? ""
+          : "";
         const channels = (post.social_post_channels ?? [])
           .map((item) => item.channel)
           .join(" ");
-        return [post.title, post.body, owner, workspace, channels]
+        return [post.title, post.body, owner, workspace?.name, store, channels]
           .join(" ")
           .toLocaleLowerCase("ja")
           .includes(normalizedQuery);
@@ -239,22 +256,54 @@ export default function AdminConsole() {
       normalizedQuery,
       posts,
       profileById,
-      statusFilter,
-      workspaceById,
+      storeById,
+      storeFilter,
+      workspaceRecordById,
     ],
+  );
+  const filteredPosts = useMemo(
+    () =>
+      storeScopedPosts.filter(
+        (post) => statusFilter === "all" || post.status === statusFilter,
+      ),
+    [statusFilter, storeScopedPosts],
+  );
+  const filteredScheduledPosts = useMemo(
+    () =>
+      storeScopedPosts
+        .filter(
+          (post) => post.status === "scheduled" && Boolean(post.scheduled_at),
+        )
+        .sort(
+          (a, b) =>
+            new Date(a.scheduled_at ?? 0).getTime() -
+            new Date(b.scheduled_at ?? 0).getTime(),
+        ),
+    [storeScopedPosts],
   );
   const filteredFiles = useMemo(
     () =>
       files.filter((file) => {
+        const workspaceRecord = workspaceRecordById.get(file.workspace_id);
+        if (
+          storeFilter !== "all" &&
+          workspaceRecord?.store_id !== storeFilter
+        ) {
+          return false;
+        }
         if (!normalizedQuery) return true;
         const owner = profileById.get(file.created_by)?.email ?? "";
-        const workspace = workspaceById.get(file.workspace_id) ?? "";
+        const workspace = workspaceRecord?.name ?? "";
+        const store = workspaceRecord?.store_id
+          ? storeById.get(workspaceRecord.store_id)?.name ?? ""
+          : "";
         const post = postById.get(file.post_id)?.title ?? "";
         return [
           file.file_name,
           file.content_type,
           owner,
           workspace,
+          store,
           post,
         ]
           .join(" ")
@@ -266,18 +315,30 @@ export default function AdminConsole() {
       normalizedQuery,
       postById,
       profileById,
-      workspaceById,
+      storeById,
+      storeFilter,
+      workspaceRecordById,
     ],
   );
   const filteredAuditLogs = useMemo(
     () =>
       auditLogs.filter((log) => {
+        const workspaceRecord = log.workspace_id
+          ? workspaceRecordById.get(log.workspace_id)
+          : null;
+        if (
+          storeFilter !== "all" &&
+          workspaceRecord?.store_id !== storeFilter
+        ) {
+          return false;
+        }
         if (!normalizedQuery) return true;
         const actor = log.actor_user_id
           ? profileById.get(log.actor_user_id)?.email ?? ""
           : "";
-        const workspace = log.workspace_id
-          ? workspaceById.get(log.workspace_id) ?? ""
+        const workspace = workspaceRecord?.name ?? "";
+        const store = workspaceRecord?.store_id
+          ? storeById.get(workspaceRecord.store_id)?.name ?? ""
           : "";
         return [
           log.label,
@@ -285,22 +346,82 @@ export default function AdminConsole() {
           entityLabels[log.entity_type] ?? log.entity_type,
           actor,
           workspace,
+          store,
         ]
           .join(" ")
           .toLocaleLowerCase("ja")
           .includes(normalizedQuery);
       }),
-    [auditLogs, normalizedQuery, profileById, workspaceById],
+    [
+      auditLogs,
+      normalizedQuery,
+      profileById,
+      storeById,
+      storeFilter,
+      workspaceRecordById,
+    ],
   );
   const filteredProfiles = useMemo(
     () =>
       profiles.filter(
         (profile) =>
-          !normalizedQuery ||
-          profile.email.toLocaleLowerCase("ja").includes(normalizedQuery),
+          (storeFilter === "all" || profile.store_id === storeFilter) &&
+          (!normalizedQuery ||
+            [
+              profile.email,
+              profile.store_id
+                ? storeById.get(profile.store_id)?.name ?? ""
+                : "",
+            ]
+              .join(" ")
+              .toLocaleLowerCase("ja")
+              .includes(normalizedQuery)),
       ),
-    [normalizedQuery, profiles],
+    [normalizedQuery, profiles, storeById, storeFilter],
   );
+  const storeSummaries = useMemo(
+    () =>
+      stores.map((store) => {
+        const workspaceIds = new Set(
+          workspaces
+            .filter((workspace) => workspace.store_id === store.id)
+            .map((workspace) => workspace.id),
+        );
+        const storePosts = posts.filter((post) =>
+          workspaceIds.has(post.workspace_id),
+        );
+        const scheduledPosts = storePosts
+          .filter(
+            (post) => post.status === "scheduled" && Boolean(post.scheduled_at),
+          )
+          .sort(
+            (a, b) =>
+              new Date(a.scheduled_at ?? 0).getTime() -
+              new Date(b.scheduled_at ?? 0).getTime(),
+          );
+
+        return {
+          store,
+          users: profiles.filter((profile) => profile.store_id === store.id)
+            .length,
+          posts: storePosts.length,
+          scheduled: scheduledPosts.length,
+          nextScheduledAt: scheduledPosts[0]?.scheduled_at ?? null,
+        };
+      }),
+    [posts, profiles, stores, workspaces],
+  );
+  const selectedStoreName =
+    storeFilter === "all"
+      ? "全店舗"
+      : storeById.get(storeFilter)?.name ?? "店舗未設定";
+
+  function getWorkspaceStoreLabel(workspaceId: string) {
+    const workspace = workspaceRecordById.get(workspaceId);
+    if (!workspace) return "不明";
+    if (!workspace.store_id) return "店舗未設定";
+    return storeById.get(workspace.store_id)?.name ?? "店舗未設定";
+  }
 
   const loadAdminData = useCallback(async () => {
     if (!supabase) return;
@@ -311,8 +432,8 @@ export default function AdminConsole() {
       const [
         profilesResult,
         adminUsersResult,
+        storesResult,
         workspacesResult,
-        membershipsResult,
         postsResult,
         filesResult,
         auditResult,
@@ -320,7 +441,7 @@ export default function AdminConsole() {
       ] = await Promise.all([
         supabase
           .from("social_user_profiles")
-          .select("user_id, email, created_at, last_sign_in_at")
+          .select("user_id, email, store_id, created_at, last_sign_in_at")
           .order("created_at", { ascending: false })
           .limit(1000),
         supabase
@@ -329,13 +450,14 @@ export default function AdminConsole() {
           .order("granted_at", { ascending: true })
           .limit(1000),
         supabase
-          .from("social_workspaces")
-          .select("id, name, created_by, created_at")
-          .order("created_at", { ascending: false })
+          .from("social_stores")
+          .select("id, name, area, sort_order, is_active")
+          .order("sort_order", { ascending: true })
           .limit(1000),
         supabase
-          .from("social_workspace_members")
-          .select("workspace_id, user_id, role")
+          .from("social_workspaces")
+          .select("id, name, store_id, created_by, created_at")
+          .order("created_at", { ascending: false })
           .limit(1000),
         supabase
           .from("social_posts")
@@ -367,8 +489,8 @@ export default function AdminConsole() {
       const failedResult = [
         profilesResult,
         adminUsersResult,
+        storesResult,
         workspacesResult,
-        membershipsResult,
         postsResult,
         filesResult,
         auditResult,
@@ -379,8 +501,8 @@ export default function AdminConsole() {
 
       setProfiles((profilesResult.data ?? []) as UserProfileRow[]);
       setAdminUsers((adminUsersResult.data ?? []) as AdminUserRow[]);
+      setStores((storesResult.data ?? []) as StoreRow[]);
       setWorkspaces((workspacesResult.data ?? []) as WorkspaceRow[]);
-      setMemberships((membershipsResult.data ?? []) as MembershipRow[]);
       setPosts((postsResult.data ?? []) as unknown as PostRow[]);
       setFiles((filesResult.data ?? []) as FileRow[]);
       setAuditLogs((auditResult.data ?? []) as unknown as AuditRow[]);
@@ -549,18 +671,6 @@ export default function AdminConsole() {
     setUpdatingAdminId(null);
   }
 
-  function getUserWorkspaceCount(userId: string) {
-    const ids = new Set(
-      workspaces
-        .filter((workspace) => workspace.created_by === userId)
-        .map((workspace) => workspace.id),
-    );
-    memberships
-      .filter((membership) => membership.user_id === userId)
-      .forEach((membership) => ids.add(membership.workspace_id));
-    return ids.size;
-  }
-
   if (sessionLoading || access === "checking") {
     return (
       <main className="admin-access-shell">
@@ -675,12 +785,18 @@ export default function AdminConsole() {
             <strong>{profiles.length}</strong>
           </div>
           <div>
-            <span>ワークスペース</span>
-            <strong>{workspaces.length}</strong>
+            <span>店舗</span>
+            <strong>{stores.length}</strong>
           </div>
           <div>
             <span>投稿</span>
             <strong>{posts.length}</strong>
+          </div>
+          <div>
+            <span>予約中</span>
+            <strong>
+              {posts.filter((post) => post.status === "scheduled").length}
+            </strong>
           </div>
           <div>
             <span>ファイル</span>
@@ -722,31 +838,115 @@ export default function AdminConsole() {
               onChange={(event) => setSearchQuery(event.target.value)}
             />
           </label>
-          {activeView === "posts" && (
+          <div className="admin-toolbar-filters">
             <label className="admin-filter">
-              <span>ステータス</span>
+              <span>店舗</span>
               <select
-                value={statusFilter}
-                onChange={(event) =>
-                  setStatusFilter(event.target.value as "all" | PostStatus)
-                }
+                value={storeFilter}
+                onChange={(event) => setStoreFilter(event.target.value)}
               >
-                <option value="all">すべて</option>
-                {statusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
+                <option value="all">全店舗</option>
+                {stores.map((store) => (
+                  <option key={store.id} value={store.id}>
+                    {store.name}
                   </option>
                 ))}
               </select>
             </label>
-          )}
+            {activeView === "posts" && (
+              <label className="admin-filter">
+                <span>ステータス</span>
+                <select
+                  value={statusFilter}
+                  onChange={(event) =>
+                    setStatusFilter(event.target.value as "all" | PostStatus)
+                  }
+                >
+                  <option value="all">すべて</option>
+                  {statusOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
         </div>
+
+        {(activeView === "posts" || activeView === "schedule") && (
+          <section
+            className="admin-table-panel admin-store-overview"
+            aria-label="店舗別運用状況"
+          >
+            <div className="admin-section-heading">
+              <div>
+                <h3>店舗別運用状況</h3>
+                <p>店舗を選択すると投稿と予約予定を絞り込めます。</p>
+              </div>
+              <button
+                className={
+                  storeFilter === "all"
+                    ? "admin-store-all active"
+                    : "admin-store-all"
+                }
+                type="button"
+                onClick={() => setStoreFilter("all")}
+              >
+                全店舗
+              </button>
+            </div>
+            <div className="admin-table-scroll admin-store-summary-scroll">
+              <table className="admin-table admin-store-table">
+                <thead>
+                  <tr>
+                    <th>店舗</th>
+                    <th>利用者</th>
+                    <th>投稿</th>
+                    <th>予約中</th>
+                    <th>次回予定</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {storeSummaries.map((summary) => (
+                    <tr
+                      className={
+                        storeFilter === summary.store.id
+                          ? "admin-store-row active"
+                          : "admin-store-row"
+                      }
+                      key={summary.store.id}
+                    >
+                      <td>
+                        <button
+                          className="admin-store-link"
+                          type="button"
+                          onClick={() => setStoreFilter(summary.store.id)}
+                        >
+                          <Building2 aria-hidden="true" size={15} />
+                          <span>
+                            <strong>{summary.store.name}</strong>
+                            <small>{summary.store.area}</small>
+                          </span>
+                        </button>
+                      </td>
+                      <td>{summary.users}</td>
+                      <td>{summary.posts}</td>
+                      <td>{summary.scheduled}</td>
+                      <td>{formatDateTime(summary.nextScheduledAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
 
         {activeView === "posts" && (
           <section className="admin-table-panel" aria-label="全投稿">
             <div className="admin-section-heading">
               <div>
-                <h3>すべての投稿</h3>
+                <h3>{selectedStoreName}の投稿</h3>
                 <p>{filteredPosts.length}件を表示</p>
               </div>
             </div>
@@ -756,7 +956,7 @@ export default function AdminConsole() {
                   <tr>
                     <th>投稿内容</th>
                     <th>利用者</th>
-                    <th>ワークスペース</th>
+                    <th>店舗</th>
                     <th>投稿先</th>
                     <th>公開予定</th>
                     <th>ステータス</th>
@@ -770,7 +970,7 @@ export default function AdminConsole() {
                         <span>{post.body || "本文なし"}</span>
                       </td>
                       <td>{profileById.get(post.created_by)?.email ?? "不明"}</td>
-                      <td>{workspaceById.get(post.workspace_id) ?? "不明"}</td>
+                      <td>{getWorkspaceStoreLabel(post.workspace_id)}</td>
                       <td>
                         <div className="admin-channel-list">
                           {(post.social_post_channels ?? []).map((item) => (
@@ -813,11 +1013,71 @@ export default function AdminConsole() {
           </section>
         )}
 
+        {activeView === "schedule" && (
+          <section className="admin-table-panel" aria-label="予約投稿予定">
+            <div className="admin-section-heading">
+              <div>
+                <h3>{selectedStoreName}の予約予定</h3>
+                <p>{filteredScheduledPosts.length}件を日時順に表示</p>
+              </div>
+              <span className="admin-count-label">
+                予約中 {filteredScheduledPosts.length}件
+              </span>
+            </div>
+            <div className="admin-table-scroll">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>公開予定</th>
+                    <th>店舗</th>
+                    <th>投稿内容</th>
+                    <th>投稿先</th>
+                    <th>利用者</th>
+                    <th>ステータス</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredScheduledPosts.map((post) => (
+                    <tr key={post.id}>
+                      <td className="admin-schedule-time">
+                        <CalendarDays aria-hidden="true" size={15} />
+                        <strong>{formatDateTime(post.scheduled_at)}</strong>
+                      </td>
+                      <td>{getWorkspaceStoreLabel(post.workspace_id)}</td>
+                      <td className="admin-primary-cell">
+                        <strong>{post.title || "無題の投稿"}</strong>
+                        <span>{post.body || "本文なし"}</span>
+                      </td>
+                      <td>
+                        <div className="admin-channel-list">
+                          {(post.social_post_channels ?? []).map((item) => (
+                            <span key={item.channel}>{item.channel}</span>
+                          ))}
+                        </div>
+                      </td>
+                      <td>{profileById.get(post.created_by)?.email ?? "不明"}</td>
+                      <td>
+                        <span className="admin-status scheduled">予約済み</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {filteredScheduledPosts.length === 0 && (
+              <div className="admin-empty">
+                <CalendarDays aria-hidden="true" size={22} />
+                <span>条件に一致する予約投稿はありません。</span>
+              </div>
+            )}
+          </section>
+        )}
+
         {activeView === "files" && (
           <section className="admin-table-panel" aria-label="全ファイル">
             <div className="admin-section-heading">
               <div>
-                <h3>すべてのファイル</h3>
+                <h3>{selectedStoreName}のファイル</h3>
                 <p>{filteredFiles.length}件を表示</p>
               </div>
             </div>
@@ -828,7 +1088,7 @@ export default function AdminConsole() {
                     <th>ファイル</th>
                     <th>投稿</th>
                     <th>利用者</th>
-                    <th>ワークスペース</th>
+                    <th>店舗</th>
                     <th>保存日時</th>
                     <th>
                       <span className="sr-only">操作</span>
@@ -846,7 +1106,7 @@ export default function AdminConsole() {
                       </td>
                       <td>{postById.get(file.post_id)?.title ?? "投稿なし"}</td>
                       <td>{profileById.get(file.created_by)?.email ?? "不明"}</td>
-                      <td>{workspaceById.get(file.workspace_id) ?? "不明"}</td>
+                      <td>{getWorkspaceStoreLabel(file.workspace_id)}</td>
                       <td>{formatDateTime(file.created_at)}</td>
                       <td className="admin-action-cell">
                         <Button
@@ -878,7 +1138,7 @@ export default function AdminConsole() {
           <section className="admin-table-panel" aria-label="全操作履歴">
             <div className="admin-section-heading">
               <div>
-                <h3>操作履歴</h3>
+                <h3>{selectedStoreName}の操作履歴</h3>
                 <p>{filteredAuditLogs.length}件を表示</p>
               </div>
             </div>
@@ -890,7 +1150,7 @@ export default function AdminConsole() {
                     <th>操作</th>
                     <th>対象</th>
                     <th>利用者</th>
-                    <th>ワークスペース</th>
+                    <th>店舗</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -915,7 +1175,7 @@ export default function AdminConsole() {
                       </td>
                       <td>
                         {log.workspace_id
-                          ? workspaceById.get(log.workspace_id) ?? "削除済み"
+                          ? getWorkspaceStoreLabel(log.workspace_id)
                           : "対象外"}
                       </td>
                     </tr>
@@ -936,7 +1196,7 @@ export default function AdminConsole() {
           <section className="admin-table-panel" aria-label="全利用者">
             <div className="admin-section-heading">
               <div>
-                <h3>利用者一覧</h3>
+                <h3>{selectedStoreName}の利用者</h3>
                 <p>{filteredProfiles.length}名を表示</p>
               </div>
               <span className="admin-count-label">
@@ -951,7 +1211,7 @@ export default function AdminConsole() {
                     <th>権限</th>
                     <th>登録日時</th>
                     <th>最終ログイン</th>
-                    <th>ワークスペース</th>
+                    <th>所属店舗</th>
                     <th>投稿</th>
                     <th>ファイル</th>
                     <th>
@@ -986,7 +1246,12 @@ export default function AdminConsole() {
                         </td>
                         <td>{formatDateTime(profile.created_at)}</td>
                         <td>{formatDateTime(profile.last_sign_in_at)}</td>
-                        <td>{getUserWorkspaceCount(profile.user_id)}</td>
+                        <td>
+                          {profile.store_id
+                            ? storeById.get(profile.store_id)?.name ??
+                              "店舗未設定"
+                            : "店舗未設定"}
+                        </td>
                         <td>
                           {
                             posts.filter(

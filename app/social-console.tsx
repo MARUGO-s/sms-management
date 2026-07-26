@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   AlertCircle,
   BarChart3,
+  Building2,
   CalendarDays,
   CheckCircle2,
   Clock3,
@@ -54,6 +55,20 @@ type ViewId =
   | "settings";
 type ApiStatus = "未設定" | "登録済み" | "入力確認済み" | "要確認";
 type RecordStatus = "下書き" | "予約済み" | "公開済み" | "失敗";
+
+type StoreRow = {
+  id: string;
+  name: string;
+  area: string;
+  sort_order: number;
+};
+
+type WorkspaceRow = {
+  id: string;
+  name: string;
+  store_id: string | null;
+  created_by: string;
+};
 
 type LocalAttachment = {
   file: File;
@@ -128,6 +143,8 @@ const emptySecretFlags: SecretFlags = {
   refreshToken: false,
   webhookSecret: false,
 };
+
+const pendingStoreKey = "instatic-talksx:pending-store";
 
 const channels: Array<{
   id: ChannelId;
@@ -248,6 +265,11 @@ export default function SocialConsole() {
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [stores, setStores] = useState<StoreRow[]>([]);
+  const [currentStore, setCurrentStore] = useState<StoreRow | null>(null);
+  const [selectedStoreId, setSelectedStoreId] = useState("");
+  const [storeSelectionRequired, setStoreSelectionRequired] = useState(false);
+  const [savingStore, setSavingStore] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
   const [savingPost, setSavingPost] = useState(false);
@@ -271,6 +293,8 @@ export default function SocialConsole() {
       if (!sessionUser) {
         setIsAdmin(false);
         setWorkspaceId(null);
+        setCurrentStore(null);
+        setStoreSelectionRequired(false);
         setHistory([]);
         setIntegrations(createDefaultIntegrations());
       }
@@ -285,6 +309,8 @@ export default function SocialConsole() {
       if (!sessionUser) {
         setIsAdmin(false);
         setWorkspaceId(null);
+        setCurrentStore(null);
+        setStoreSelectionRequired(false);
         setHistory([]);
         setIntegrations(createDefaultIntegrations());
       }
@@ -292,6 +318,29 @@ export default function SocialConsole() {
     });
 
     return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!supabase) return;
+    let active = true;
+
+    void supabase
+      .from("social_stores")
+      .select("id, name, area, sort_order")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) {
+          setAuthMessage("店舗一覧を読み込めませんでした。再読み込みしてください。");
+          return;
+        }
+        setStores((data ?? []) as StoreRow[]);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -320,6 +369,13 @@ export default function SocialConsole() {
     () => selectedChannels.map((id) => channelById[id].label),
     [selectedChannels],
   );
+  const storeGroups = useMemo(() => {
+    const grouped = new Map<string, StoreRow[]>();
+    for (const store of stores) {
+      grouped.set(store.area, [...(grouped.get(store.area) ?? []), store]);
+    }
+    return Array.from(grouped.entries());
+  }, [stores]);
   const selectedHistory = history.find(
     (record) => record.id === selectedHistoryId,
   );
@@ -385,17 +441,26 @@ export default function SocialConsole() {
     setNotice(null);
 
     try {
-      const { data: ownedWorkspace, error: ownedWorkspaceError } = await supabase
-        .from("social_workspaces")
-        .select("id, name")
-        .eq("created_by", currentUser.id)
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
+      const [profileResult, ownedWorkspaceResult] = await Promise.all([
+        supabase
+          .from("social_user_profiles")
+          .select("store_id")
+          .eq("user_id", currentUser.id)
+          .maybeSingle(),
+        supabase
+          .from("social_workspaces")
+          .select("id, name, store_id, created_by")
+          .eq("created_by", currentUser.id)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle(),
+      ]);
 
-      if (ownedWorkspaceError) throw ownedWorkspaceError;
+      if (profileResult.error) throw profileResult.error;
+      if (ownedWorkspaceResult.error) throw ownedWorkspaceResult.error;
 
-      let activeWorkspace = ownedWorkspace;
+      let activeWorkspace =
+        (ownedWorkspaceResult.data as WorkspaceRow | null) ?? null;
       if (!activeWorkspace) {
         const { data: membership, error: membershipError } = await supabase
           .from("social_workspace_members")
@@ -411,12 +476,88 @@ export default function SocialConsole() {
           const { data: memberWorkspace, error: memberWorkspaceError } =
             await supabase
               .from("social_workspaces")
-              .select("id, name")
+              .select("id, name, store_id, created_by")
               .eq("id", membership.workspace_id)
               .single();
 
           if (memberWorkspaceError) throw memberWorkspaceError;
-          activeWorkspace = memberWorkspace;
+          activeWorkspace = memberWorkspace as WorkspaceRow;
+        }
+      }
+
+      const metadataStoreId =
+        typeof currentUser.user_metadata?.social_store_id === "string"
+          ? currentUser.user_metadata.social_store_id
+          : null;
+      const pendingStoreId =
+        typeof window === "undefined"
+          ? null
+          : window.localStorage.getItem(pendingStoreKey);
+      const candidateStoreId =
+        activeWorkspace?.store_id ??
+        profileResult.data?.store_id ??
+        pendingStoreId ??
+        metadataStoreId;
+
+      if (!candidateStoreId) {
+        setWorkspaceId(null);
+        setCurrentStore(null);
+        setStoreSelectionRequired(true);
+        setHistory([]);
+        setIntegrations(createDefaultIntegrations());
+        return;
+      }
+
+      const { data: selectedStore, error: selectedStoreError } = await supabase
+        .from("social_stores")
+        .select("id, name, area, sort_order")
+        .eq("id", candidateStoreId)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (selectedStoreError) throw selectedStoreError;
+      if (!selectedStore) {
+        window.localStorage.removeItem(pendingStoreKey);
+        setSelectedStoreId("");
+        setStoreSelectionRequired(true);
+        return;
+      }
+
+      if (!profileResult.data?.store_id) {
+        const { error: profileUpdateError } = await supabase
+          .from("social_user_profiles")
+          .update({ store_id: selectedStore.id })
+          .eq("user_id", currentUser.id)
+          .is("store_id", null);
+        if (profileUpdateError) throw profileUpdateError;
+      }
+
+      if (!activeWorkspace || !activeWorkspace.store_id) {
+        if (activeWorkspace?.created_by === currentUser.id) {
+          const { data: updatedWorkspace, error: updateWorkspaceError } =
+            await supabase
+              .from("social_workspaces")
+              .update({
+                name: selectedStore.name,
+                store_id: selectedStore.id,
+              })
+              .eq("id", activeWorkspace.id)
+              .select("id, name, store_id, created_by")
+              .single();
+          if (updateWorkspaceError) throw updateWorkspaceError;
+          activeWorkspace = updatedWorkspace as WorkspaceRow;
+        } else {
+          const { data: createdWorkspace, error: createError } = await supabase
+            .from("social_workspaces")
+            .insert({
+              name: selectedStore.name,
+              store_id: selectedStore.id,
+              created_by: currentUser.id,
+            })
+            .select("id, name, store_id, created_by")
+            .single();
+          if (createError) throw createError;
+          activeWorkspace = createdWorkspace as WorkspaceRow;
         }
       }
 
@@ -424,16 +565,21 @@ export default function SocialConsole() {
         const { data: createdWorkspace, error: createError } = await supabase
           .from("social_workspaces")
           .insert({
-            name: "Instatic TalksX",
+            name: selectedStore.name,
+            store_id: selectedStore.id,
             created_by: currentUser.id,
           })
-          .select("id, name")
+          .select("id, name, store_id, created_by")
           .single();
         if (createError) throw createError;
-        activeWorkspace = createdWorkspace;
+        activeWorkspace = createdWorkspace as WorkspaceRow;
       }
 
       setWorkspaceId(activeWorkspace.id);
+      setCurrentStore(selectedStore as StoreRow);
+      setSelectedStoreId(selectedStore.id);
+      setStoreSelectionRequired(false);
+      window.localStorage.removeItem(pendingStoreKey);
 
       const [postsResult, integrationsResult] = await Promise.all([
         supabase
@@ -533,8 +679,16 @@ export default function SocialConsole() {
   async function handleAuth(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase) return;
+    if (authMode === "signup" && !selectedStoreId) {
+      setAuthMessage("所属する店舗を選択してください。");
+      return;
+    }
     setAuthLoading(true);
     setAuthMessage("");
+
+    if (authMode === "signup") {
+      window.localStorage.setItem(pendingStoreKey, selectedStoreId);
+    }
 
     const result =
       authMode === "signin"
@@ -542,10 +696,16 @@ export default function SocialConsole() {
         : await supabase.auth.signUp({
             email,
             password,
-            options: { emailRedirectTo: window.location.origin },
+            options: {
+              emailRedirectTo: window.location.origin,
+              data: { social_store_id: selectedStoreId },
+            },
           });
 
     if (result.error) {
+      if (authMode === "signup") {
+        window.localStorage.removeItem(pendingStoreKey);
+      }
       setAuthMessage(result.error.message);
     } else if (authMode === "signup" && !result.data.session) {
       setAuthMessage(
@@ -557,8 +717,16 @@ export default function SocialConsole() {
 
   async function signInWithGoogle() {
     if (!supabase) return;
+    if (authMode === "signup" && !selectedStoreId) {
+      setAuthMessage("所属する店舗を選択してください。");
+      return;
+    }
     setAuthLoading(true);
     setAuthMessage("");
+
+    if (authMode === "signup") {
+      window.localStorage.setItem(pendingStoreKey, selectedStoreId);
+    }
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -569,6 +737,9 @@ export default function SocialConsole() {
     });
 
     if (error) {
+      if (authMode === "signup") {
+        window.localStorage.removeItem(pendingStoreKey);
+      }
       setAuthMessage(error.message);
       setAuthLoading(false);
       return;
@@ -581,6 +752,42 @@ export default function SocialConsole() {
 
     setAuthMessage("Google認証を開始できませんでした。");
     setAuthLoading(false);
+  }
+
+  async function completeStoreAssignment() {
+    if (!supabase || !user || !selectedStoreId) {
+      setAuthMessage("所属する店舗を選択してください。");
+      return;
+    }
+
+    const selectedStore = stores.find(
+      (store) => store.id === selectedStoreId,
+    );
+    if (!selectedStore) {
+      setAuthMessage("店舗一覧を再読み込みして選択してください。");
+      return;
+    }
+
+    setSavingStore(true);
+    setAuthMessage("");
+
+    try {
+      const { error: profileError } = await supabase
+        .from("social_user_profiles")
+        .update({ store_id: selectedStore.id })
+        .eq("user_id", user.id)
+        .is("store_id", null);
+      if (profileError) throw profileError;
+
+      window.localStorage.setItem(pendingStoreKey, selectedStore.id);
+      await loadWorkspaceData(user);
+    } catch (error) {
+      setAuthMessage(
+        getErrorMessage(error, "所属店舗を保存できませんでした。"),
+      );
+    } finally {
+      setSavingStore(false);
+    }
   }
 
   async function sendPasswordReset() {
@@ -954,6 +1161,27 @@ export default function SocialConsole() {
               <p>業務データはアカウントごとに保護されます。</p>
             </div>
           </div>
+          {authMode === "signup" && (
+            <label className="auth-store-field">
+              <span>所属店舗</span>
+              <select
+                value={selectedStoreId}
+                onChange={(event) => setSelectedStoreId(event.target.value)}
+                required
+              >
+                <option value="">店舗を選択してください</option>
+                {storeGroups.map(([area, areaStores]) => (
+                  <optgroup key={area} label={area}>
+                    {areaStores.map((store) => (
+                      <option key={store.id} value={store.id}>
+                        {store.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+          )}
           <Button
             className="auth-provider-button"
             type="button"
@@ -1029,6 +1257,69 @@ export default function SocialConsole() {
     );
   }
 
+  if (storeSelectionRequired) {
+    return (
+      <main className="auth-shell">
+        <section className="auth-panel store-onboarding-panel">
+          <div className="auth-brand">
+            <div className="brand-mark">IX</div>
+            <div>
+              <p className="eyebrow">Store Assignment</p>
+              <h1>所属店舗を設定</h1>
+            </div>
+          </div>
+          <div className="auth-heading">
+            <Building2 aria-hidden="true" size={20} />
+            <div>
+              <h2>運用する店舗を選択</h2>
+              <p>投稿・予約・履歴は選択した店舗単位で管理されます。</p>
+            </div>
+          </div>
+          <label className="auth-store-field">
+            <span>所属店舗</span>
+            <select
+              value={selectedStoreId}
+              onChange={(event) => setSelectedStoreId(event.target.value)}
+            >
+              <option value="">店舗を選択してください</option>
+              {storeGroups.map(([area, areaStores]) => (
+                <optgroup key={area} label={area}>
+                  {areaStores.map((store) => (
+                    <option key={store.id} value={store.id}>
+                      {store.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </label>
+          {authMessage && <p className="auth-message">{authMessage}</p>}
+          <Button
+            className="primary-button"
+            type="button"
+            variant="primary"
+            isDisabled={savingStore || !selectedStoreId}
+            onPress={() => void completeStoreAssignment()}
+          >
+            {savingStore ? (
+              <Loader2 className="spin" aria-hidden="true" size={18} />
+            ) : (
+              <Building2 aria-hidden="true" size={18} />
+            )}
+            <span>この店舗で開始</span>
+          </Button>
+          <button
+            className="store-onboarding-signout"
+            type="button"
+            onClick={() => void supabase.auth.signOut()}
+          >
+            別のアカウントでログイン
+          </button>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar" aria-label="SNS管理メニュー">
@@ -1037,6 +1328,14 @@ export default function SocialConsole() {
           <div>
             <p className="eyebrow">SNS Ops Console</p>
             <h1>Instatic TalksX</h1>
+          </div>
+        </div>
+
+        <div className="store-context" aria-label="現在の店舗">
+          <Building2 aria-hidden="true" size={17} />
+          <div>
+            <small>所属店舗</small>
+            <strong>{currentStore?.name ?? "店舗未設定"}</strong>
           </div>
         </div>
 
@@ -1098,7 +1397,7 @@ export default function SocialConsole() {
         <div className="user-panel">
           <div>
             <strong>{user.email}</strong>
-            <small>Supabaseで保護</small>
+            <small>{currentStore?.name ?? "店舗未設定"} / Supabaseで保護</small>
           </div>
           <button
             className="icon-button"
@@ -1114,7 +1413,9 @@ export default function SocialConsole() {
       <section className="workspace">
         <header className="topbar">
           <div>
-            <p className="eyebrow">本日の運用</p>
+            <p className="eyebrow">
+              {currentStore?.name ?? "店舗未設定"} / 本日の運用
+            </p>
             <h2>
               {activeView === "compose" && "投稿を作成"}
               {activeView === "calendar" && "予約一覧"}
