@@ -24,6 +24,7 @@ import {
   LockKeyhole,
   LogOut,
   Paperclip,
+  Play,
   PlugZap,
   Plus,
   RefreshCcw,
@@ -41,6 +42,7 @@ import {
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ChangeEvent,
   type FormEvent,
@@ -51,6 +53,7 @@ import MediaEditor, {
   defaultMediaCrop,
   type MediaCropConfig,
 } from "./media-editor";
+import VideoViewer from "./video-viewer";
 
 type ChannelId = "instagram" | "tiktok" | "x" | "threads";
 type ViewId =
@@ -312,6 +315,12 @@ export default function SocialConsole() {
   const [dispatchingMediaJobId, setDispatchingMediaJobId] = useState<
     string | null
   >(null);
+  const [openingVideoId, setOpeningVideoId] = useState<string | null>(null);
+  const [videoViewer, setVideoViewer] = useState<{
+    file: SavedFile;
+    url: string;
+  } | null>(null);
+  const videoRequestId = useRef(0);
   const [activeIntegrationId, setActiveIntegrationId] =
     useState<ChannelId>("instagram");
   const [integrations, setIntegrations] = useState<
@@ -352,12 +361,14 @@ export default function SocialConsole() {
       const sessionUser = data.session?.user ?? null;
       setUser(sessionUser);
       if (!sessionUser) {
+        videoRequestId.current += 1;
         setIsAdmin(false);
         setWorkspaceId(null);
         setCurrentStore(null);
         setStoreSelectionRequired(false);
         setHistory([]);
         setIntegrations(createDefaultIntegrations());
+        setVideoViewer(null);
       }
       setAuthLoading(false);
     });
@@ -368,12 +379,14 @@ export default function SocialConsole() {
       const sessionUser = session?.user ?? null;
       setUser(sessionUser);
       if (!sessionUser) {
+        videoRequestId.current += 1;
         setIsAdmin(false);
         setWorkspaceId(null);
         setCurrentStore(null);
         setStoreSelectionRequired(false);
         setHistory([]);
         setIntegrations(createDefaultIntegrations());
+        setVideoViewer(null);
       }
       setAuthLoading(false);
     });
@@ -1151,6 +1164,36 @@ export default function SocialConsole() {
       return;
     }
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }
+
+  async function openVideoViewer(file: SavedFile) {
+    if (!supabase || !file.type.startsWith("video/")) return;
+    const requestId = videoRequestId.current + 1;
+    videoRequestId.current = requestId;
+    setOpeningVideoId(file.id);
+    setNotice(null);
+    try {
+      const { data, error } = await supabase.storage
+        .from("post-files")
+        .createSignedUrl(file.storagePath, 60 * 60);
+      if (error) throw error;
+      if (requestId !== videoRequestId.current) return;
+      setVideoViewer({ file, url: data.signedUrl });
+    } catch (error) {
+      if (requestId !== videoRequestId.current) return;
+      setNotice({
+        tone: "error",
+        text: getErrorMessage(error, "動画をアプリ内で開けませんでした。"),
+      });
+    } finally {
+      if (requestId === videoRequestId.current) setOpeningVideoId(null);
+    }
+  }
+
+  function closeVideoViewer() {
+    videoRequestId.current += 1;
+    setOpeningVideoId(null);
+    setVideoViewer(null);
   }
 
   async function dispatchMediaJob(jobId: string) {
@@ -2092,15 +2135,36 @@ export default function SocialConsole() {
                       selectedHistory.files.map((file) => (
                         <div className="saved-file-item" key={file.id}>
                           <button
+                            aria-label={
+                              file.type.startsWith("video/")
+                                ? `${file.name}をアプリ内で再生`
+                                : `${file.name}をダウンロード`
+                            }
                             className="saved-file-row"
+                            disabled={openingVideoId === file.id}
+                            title={
+                              file.type.startsWith("video/")
+                                ? "アプリ内で動画を再生"
+                                : "ファイルをダウンロード"
+                            }
                             type="button"
-                            onClick={() => void downloadFile(file)}
+                            onClick={() =>
+                              file.type.startsWith("video/")
+                                ? void openVideoViewer(file)
+                                : void downloadFile(file)
+                            }
                           >
-                            <FileText aria-hidden="true" size={17} />
+                            {file.type.startsWith("video/") ? (
+                              <Video aria-hidden="true" size={17} />
+                            ) : (
+                              <FileText aria-hidden="true" size={17} />
+                            )}
                             <span>
                               <strong>{file.name}</strong>
                               <small>
                                 {formatFileSize(file.size)}
+                                {file.type.startsWith("video/") &&
+                                  " / アプリ内再生"}
                                 {file.variant === "processed" && " / 変換済み"}
                                 {file.mediaJob?.status === "queued" &&
                                   ` / ${file.mediaJob.aspect} 処理待ち`}
@@ -2112,43 +2176,70 @@ export default function SocialConsole() {
                                   " / 動画処理失敗"}
                               </small>
                             </span>
-                            <Download aria-hidden="true" size={16} />
+                            {openingVideoId === file.id ? (
+                              <Loader2
+                                aria-hidden="true"
+                                className="spin"
+                                size={16}
+                              />
+                            ) : file.type.startsWith("video/") ? (
+                              <Play aria-hidden="true" size={16} />
+                            ) : (
+                              <Download aria-hidden="true" size={16} />
+                            )}
                           </button>
-                          {file.variant === "original" &&
-                            file.mediaJob &&
-                            (["queued", "failed"].includes(
-                              file.mediaJob.status,
-                            ) ||
-                              (["dispatching", "processing"].includes(
-                                file.mediaJob.status,
-                              ) &&
-                                file.mediaJob.stale)) && (
+                          <div className="saved-file-actions">
+                            {file.type.startsWith("video/") && (
                               <button
-                                className="media-job-retry"
-                                disabled={
-                                  dispatchingMediaJobId === file.mediaJob.id
-                                }
-                                onClick={() =>
-                                  void dispatchMediaJob(file.mediaJob!.id)
-                                }
+                                aria-label={`${file.name}をダウンロード`}
+                                className="saved-file-action"
+                                onClick={() => void downloadFile(file)}
                                 type="button"
                               >
-                                {dispatchingMediaJobId === file.mediaJob.id ? (
-                                  <Loader2
-                                    aria-hidden="true"
-                                    className="spin"
-                                    size={14}
-                                  />
-                                ) : (
-                                  <RefreshCcw aria-hidden="true" size={14} />
-                                )}
-                                <span>
-                                  {file.mediaJob.stale
-                                    ? "停止した処理を再実行"
-                                    : "処理を再実行"}
-                                </span>
+                                <Download aria-hidden="true" size={14} />
+                                <span>保存</span>
                               </button>
                             )}
+                            {file.variant === "original" &&
+                              file.mediaJob &&
+                              (["queued", "failed"].includes(
+                                file.mediaJob.status,
+                              ) ||
+                                (["dispatching", "processing"].includes(
+                                  file.mediaJob.status,
+                                ) &&
+                                  file.mediaJob.stale)) && (
+                                <button
+                                  className="media-job-retry"
+                                  disabled={
+                                    dispatchingMediaJobId === file.mediaJob.id
+                                  }
+                                  onClick={() =>
+                                    void dispatchMediaJob(file.mediaJob!.id)
+                                  }
+                                  type="button"
+                                >
+                                  {dispatchingMediaJobId ===
+                                  file.mediaJob.id ? (
+                                    <Loader2
+                                      aria-hidden="true"
+                                      className="spin"
+                                      size={14}
+                                    />
+                                  ) : (
+                                    <RefreshCcw
+                                      aria-hidden="true"
+                                      size={14}
+                                    />
+                                  )}
+                                  <span>
+                                    {file.mediaJob.stale
+                                      ? "停止した処理を再実行"
+                                      : "処理を再実行"}
+                                  </span>
+                                </button>
+                              )}
+                          </div>
                         </div>
                       ))
                     ) : (
@@ -2532,6 +2623,17 @@ export default function SocialConsole() {
           onSave={(crop) => saveAttachmentCrop(editingAttachment.id, crop)}
           previewUrl={editingAttachment.previewUrl}
           value={editingAttachment.crop ?? defaultMediaCrop}
+        />
+      )}
+      {videoViewer && (
+        <VideoViewer
+          fileName={videoViewer.file.name}
+          onClose={closeVideoViewer}
+          onDownload={() => void downloadFile(videoViewer.file)}
+          url={videoViewer.url}
+          variantLabel={
+            videoViewer.file.variant === "processed" ? "変換済み" : "元動画"
+          }
         />
       )}
     </>

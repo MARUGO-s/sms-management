@@ -110,7 +110,7 @@ test("store affiliation, administrator schedules, and knowledge maps remain wire
   assert.match(agentRules, /Obsidian/);
 });
 
-test("video crop jobs keep originals and recover stale dispatches safely", async () => {
+test("video files support in-app playback and crop jobs recover safely", async () => {
   const [
     consoleSource,
     editorSource,
@@ -118,6 +118,7 @@ test("video crop jobs keep originals and recover stale dispatches safely", async
     recoveryMigration,
     workerSource,
     dispatcherSource,
+    viewerSource,
   ] =
     await Promise.all([
       readFile(new URL("../app/social-console.tsx", import.meta.url), "utf8"),
@@ -144,12 +145,23 @@ test("video crop jobs keep originals and recover stale dispatches safely", async
         new URL("../supabase/functions/media-jobs/index.ts", import.meta.url),
         "utf8",
       ),
+      readFile(new URL("../app/video-viewer.tsx", import.meta.url), "utf8"),
     ]);
 
   assert.match(consoleSource, /動画をクロップ|クロップ設定/);
   assert.match(consoleSource, /media-jobs/);
   assert.match(consoleSource, /処理を再実行/);
   assert.match(consoleSource, /停止した処理を再実行/);
+  assert.match(consoleSource, /openVideoViewer/);
+  assert.match(consoleSource, /アプリ内再生/);
+  assert.match(consoleSource, /createSignedUrl\(file\.storagePath, 60 \* 60\)/);
+  assert.match(consoleSource, /videoRequestId/);
+  assert.match(consoleSource, /<VideoViewer/);
+  assert.match(viewerSource, /アプリ内で動画を再生/);
+  assert.match(viewerSource, /controls/);
+  assert.match(viewerSource, /playsInline/);
+  assert.match(viewerSource, /event\.key === "Escape"/);
+  assert.match(viewerSource, /動画を読み込めませんでした/);
   assert.match(editorSource, /"1:1".*"4:5".*"9:16".*"16:9"/s);
   assert.match(migrationSource, /create table public\.social_media_jobs/);
   assert.match(migrationSource, /media_variant/);

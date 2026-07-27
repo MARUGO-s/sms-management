@@ -27,6 +27,10 @@ The legacy OpenAI Sites deployment remains available as a secondary preview only
 - Google OAuth signup keeps the selected store only as a temporary browser handoff until the callback completes. Existing users whose profile has no store see a one-time required store selection before the operations console loads.
 - Never use `user_metadata` for authorization. Canonical store scope comes from `social_user_profiles.store_id` and `social_workspaces.store_id`; RLS remains user/workspace based.
 - Posts, history, channels, and file metadata are stored in Postgres. File bytes are stored in private Storage.
+- History videos can be streamed inside the app. The browser requests a
+  temporary signed Storage URL only when the user opens a video; original and
+  processed videos remain private, and the separate download action remains
+  available.
 - Video crop settings support 1:1, 4:5, 9:16, and 16:9. The source is preserved, `social_media_jobs` records the asynchronous state, and processed MP4 files are added as separate `social_post_files` rows.
 - The `media-jobs` Edge Function dispatches Cloud Run Jobs. Without Google Cloud secrets it safely returns `configured: false` and leaves the job queued. Users can retry queued or failed jobs from history.
 - The FFmpeg worker is in `workers/media-processor/`. Its deployment and secret setup are documented in `workers/media-processor/README.md`.

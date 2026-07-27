@@ -4,12 +4,12 @@
 - cluster-only mode — file stats not available
 
 ## Summary
-- 336 nodes · 354 edges · 32 communities (24 shown, 8 thin omitted)
+- 339 nodes · 357 edges · 32 communities (24 shown, 8 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 1 edges (avg confidence: 0.5)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `9e79ccd8`
+- Built from commit: `d9c4c54e`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -73,8 +73,8 @@
 ## Communities (32 total, 8 thin omitted)
 
 ### Community 0 - "Community 0"
-Cohesion: 0.06
-Nodes (28): aspectOptions, defaultMediaCrop, MediaAspect, MediaCropConfig, MediaEditorProps, ApiStatus, channelById, ChannelId (+20 more)
+Cohesion: 0.05
+Nodes (29): aspectOptions, defaultMediaCrop, MediaAspect, MediaCropConfig, MediaEditorProps, ApiStatus, channelById, ChannelId (+21 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.06
@@ -161,7 +161,7 @@ Cohesion: 0.50
 Nodes (3): imports, @supabase/functions-js, @supabase/server
 
 ## Knowledge Gaps
-- **184 isolated node(s):** `ChatGPTUser`, `MediaAspect`, `aspectOptions`, `MediaEditorProps`, `eslintConfig` (+179 more)
+- **185 isolated node(s):** `ChatGPTUser`, `MediaAspect`, `aspectOptions`, `MediaEditorProps`, `eslintConfig` (+180 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **8 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -169,13 +169,13 @@ Nodes (3): imports, @supabase/functions-js, @supabase/server
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `devDependencies` connect `Community 1` to `Community 5`?**
-  _High betweenness centrality (0.031) - this node is a cross-community bridge._
+  _High betweenness centrality (0.030) - this node is a cross-community bridge._
 - **Why does `dependencies` connect `Community 7` to `Community 5`?**
-  _High betweenness centrality (0.018) - this node is a cross-community bridge._
+  _High betweenness centrality (0.017) - this node is a cross-community bridge._
 - **What connects `ChatGPTUser`, `MediaAspect`, `aspectOptions` to the rest of the system?**
-  _184 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _185 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.058029689608636977 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.053426248548199766 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
   _Cohesion score 0.06060606060606061 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
