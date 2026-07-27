@@ -19,13 +19,14 @@ echo "[worker:docker] checking Node, FFmpeg, libx264, and non-root runtime..."
 docker run --rm --platform "$platform" --entrypoint sh "$image" -c \
   'node --version && ffmpeg -version | head -1 && ffmpeg -encoders 2>/dev/null | grep -q libx264 && echo libx264-ready && test "$(id -u)" != "0" && id'
 
-echo "[worker:docker] running crop-plan tests inside the image..."
+echo "[worker:docker] running crop and encoding plan tests inside the image..."
 docker run --rm \
   --platform "$platform" \
   -v "$worker_dir/crop-plan.test.mjs:/app/crop-plan.test.mjs:ro" \
+  -v "$worker_dir/encoding-plan.test.mjs:/app/encoding-plan.test.mjs:ro" \
   --entrypoint node \
   "$image" \
-  --test /app/crop-plan.test.mjs
+  --test /app/crop-plan.test.mjs /app/encoding-plan.test.mjs
 
 echo "[worker:docker] encoding and probing a real 9:16 MP4..."
 docker run --rm --platform "$platform" --entrypoint sh "$image" -c '

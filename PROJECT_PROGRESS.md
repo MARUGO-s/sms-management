@@ -1131,3 +1131,16 @@ supabase functions deploy media-jobs --use-api
 - Dropbox: commit後にGit管理ツリーを`instatic-talksx`ソースミラーへ同期し、`.git`と`.env*`を含めない。Obsidian Vaultは`アプリ知識`で独立同期し、同じノートを複数PCで同時編集しない。
 - 未完了事項: 認証済み本番`/admin`でシステムマップの2表示を切り替える最終操作確認。本番データに関する既存未完了（9分16秒動画の変換済みMP4再生確認、SNS実連携）は継続。
 - 次の作業: 次の開発依頼からこの知識フローを実運用する。別アプリをVaultへ追加する際は、アプリ固有の`70_AI作業環境/`、`90_Graphify/`、構成モデル、更新/検査/検索コマンドを同じ設計で用意する。
+
+### 2026-07-28 01:30 JST - Cloud Run動画処理の停止を修復
+
+- 依頼: 履歴で処理中のままになっていた動画1件の原因を調査し、再発しない形で修復する。
+- 原因1: Cloud Run Executionは起動していたが、Secret Managerの`SUPABASE_SECRET_KEY`が無効で、workerの最初のREST取得が`401 Invalid API key`になっていた。正しいSupabase secret keyを新しいSecretバージョンとして追加し、Cloud Run Jobは固定バージョンを参照するよう更新。
+- 原因2: key修正後、固定2.6Mbpsで生成したMP4がSupabase Storageの50MB上限を超え、uploadが`400`になった。動画時間から安全なビットレートを計算し、長尺時だけ720ベースへ縮小する`encoding-plan.mjs`を追加。50MBを超える出力はupload前に失敗へ移し、品質を保てない極端な長尺動画は明確なエラーにする。
+- 原因3: Edge FunctionがCloud Run APIの受付時点で`processing`にしていたため、worker起動前・起動直後の失敗が永久に処理中表示となった。`dispatching`状態を追加し、worker開始時だけ`processing`へ変更。20分以上更新されない`dispatching`/`processing`を安全に再配送可能にした。
+- 冪等性: 同じjob IDで再実行しても、固定Storageパスと`storage_path`競合upsertを使い、処理済みファイル行を重複させない。既存の処理済み行があればジョブだけ`completed`へ回復する。
+- 本番反映: migration `20260727152027_add_media_job_dispatching_state.sql`を適用。`media-jobs` Edge Functionを再デプロイ。Cloud Run workerを固定digestへ更新。Google Secret Managerの秘密値そのものはGit・チャット・文書へ記録していない。
+- 実データ復旧: 対象jobを同じID・元動画のまま再実行し、Cloud Run Executionは6分57秒で成功。DBは`completed`、`attempts=3`、エラーなし、処理済みファイルは44,992,238 bytes。元動画1件・処理済み動画1件で重複なし。
+- 実ファイル検証: 元動画はH.264/AAC・1280×720・235.01秒・43,608,654 bytes。処理済みはH.264/AAC・1080×1920・235.01秒・44,992,238 bytes。以前の「9分16秒」は誤記で、実ファイルは3分55秒。時間欠落なし。
+- テスト: `deno check`成功、`npm run lint`はerror 0・既存warning 1、`npm test`は12件すべて成功、`npm run worker:docker:check`成功。9分16秒相当の計算テストでは720×1280・推定43.2MiBとなることを確認。
+- 次の作業: 本番履歴を再読み込みし、利用者画面で「変換済み」とダウンロード操作を確認する。今後Cloud Runに失敗が出た場合は、DBの`error_message`とExecutionログの両方を確認する。

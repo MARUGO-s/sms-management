@@ -16,6 +16,11 @@ The source video is never overwritten. The processed file is inserted as a new
 - The history screen can retry a queued or failed job.
 - The worker targets one task at a time and a 15-minute timeout.
 - The current worker supports video input and MP4 output.
+- Output bitrate is calculated from source duration so the processed file stays
+  below the 50 MB Storage limit. Short videos keep the normal output
+  resolution; long videos use a compact 720-based output when required.
+- Jobs move through `queued` -> `dispatching` -> `processing`. An active job
+  with no update for 20 minutes can be safely dispatched again from History.
 
 ## Required Google Cloud resources
 
@@ -126,8 +131,10 @@ supabase functions deploy media-jobs \
 6. Refresh history and download the new processed MP4.
 7. Confirm the original file still exists.
 
-Run the crop calculation tests locally:
+Run the crop and encoding calculation tests locally:
 
 ```bash
-node --test workers/media-processor/crop-plan.test.mjs
+node --test \
+  workers/media-processor/crop-plan.test.mjs \
+  workers/media-processor/encoding-plan.test.mjs
 ```

@@ -6,14 +6,46 @@ type DispatchPayload = {
   jobId?: string;
 };
 
+type MediaJobStatus =
+  | "queued"
+  | "dispatching"
+  | "processing"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+type MediaJob = {
+  id: string;
+  workspace_id: string;
+  status: MediaJobStatus;
+  updated_at: string;
+};
+
 type GoogleServiceAccount = {
   client_email: string;
   private_key: string;
   project_id?: string;
 };
 
+const staleAfterMs = 20 * 60 * 1000;
+
 function response(body: unknown, status = 200) {
   return Response.json(body, { status });
+}
+
+function mutation<T>(value: T) {
+  // The Edge runtime client has no generated project Database type, so
+  // mutations are inferred as never even though the runtime schema is valid.
+  return value as never;
+}
+
+function isActiveStatus(status: MediaJobStatus) {
+  return status === "dispatching" || status === "processing";
+}
+
+function isStale(job: MediaJob, now = Date.now()) {
+  const updatedAt = Date.parse(job.updated_at);
+  return !Number.isFinite(updatedAt) || now - updatedAt >= staleAfterMs;
 }
 
 function encodeBase64Url(value: Uint8Array | string) {
@@ -93,16 +125,45 @@ const mediaJobsFunction = {
 
     const { data: job, error: jobError } = await ctx.supabase
       .from("social_media_jobs")
-      .select("id, workspace_id, status")
+      .select("id, workspace_id, status, updated_at")
       .eq("id", payload.jobId)
       .maybeSingle();
     if (jobError) return response({ error: jobError.message }, 500);
     if (!job) return response({ error: "Media job not found" }, 404);
-    if (job.status === "completed" || job.status === "cancelled") {
-      return response({ ok: true, status: job.status });
+    const mediaJob = job as MediaJob;
+    if (mediaJob.status === "completed" || mediaJob.status === "cancelled") {
+      return response({ ok: true, status: mediaJob.status });
     }
-    if (job.status === "processing") {
-      return response({ ok: true, status: "processing" }, 202);
+    if (isActiveStatus(mediaJob.status) && !isStale(mediaJob)) {
+      return response({ ok: true, status: mediaJob.status }, 202);
+    }
+
+    const claimTime = new Date().toISOString();
+    let claimQuery = ctx.supabaseAdmin
+      .from("social_media_jobs")
+      .update(mutation({
+        status: "dispatching",
+        provider_run_name: "",
+        error_code: "",
+        error_message: "",
+        started_at: null,
+        completed_at: null,
+        updated_at: claimTime,
+      }))
+      .eq("id", mediaJob.id)
+      .eq("status", mediaJob.status);
+    if (isActiveStatus(mediaJob.status)) {
+      claimQuery = claimQuery.eq("updated_at", mediaJob.updated_at);
+    }
+    const { data: claimedJob, error: claimError } = await claimQuery
+      .select("id")
+      .maybeSingle();
+    if (claimError) return response({ error: claimError.message }, 500);
+    if (!claimedJob) {
+      return response(
+        { error: "Media job state changed. Refresh and try again." },
+        409,
+      );
     }
 
     const rawServiceAccount = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
@@ -112,13 +173,14 @@ const mediaJobsFunction = {
     if (!rawServiceAccount || !projectId || !region || !cloudRunJob) {
       await ctx.supabaseAdmin
         .from("social_media_jobs")
-        .update({
+        .update(mutation({
           status: "queued",
           error_code: "",
           error_message: "",
           updated_at: new Date().toISOString(),
-        })
-        .eq("id", job.id);
+        }))
+        .eq("id", mediaJob.id)
+        .eq("status", "dispatching");
       return response(
         {
           ok: true,
@@ -151,7 +213,7 @@ const mediaJobsFunction = {
               containerOverrides: [
                 {
                   env: [
-                    { name: "MEDIA_JOB_ID", value: job.id },
+                    { name: "MEDIA_JOB_ID", value: mediaJob.id },
                     { name: "MEDIA_BUCKET", value: "post-files" },
                   ],
                 },
@@ -175,34 +237,33 @@ const mediaJobsFunction = {
 
       const { error: updateError } = await ctx.supabaseAdmin
         .from("social_media_jobs")
-        .update({
-          status: "processing",
+        .update(mutation({
           provider_run_name: runData.name ?? "",
-          error_code: "",
-          error_message: "",
-          started_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        })
-        .eq("id", job.id);
-      if (updateError) throw updateError;
+        }))
+        .eq("id", mediaJob.id)
+        .eq("status", "dispatching");
 
       return response({
         ok: true,
         configured: true,
-        status: "processing",
+        status: "dispatching",
+        trackingSaved: !updateError,
       }, 202);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Cloud Run dispatch failed";
       await ctx.supabaseAdmin
         .from("social_media_jobs")
-        .update({
+        .update(mutation({
           status: "failed",
           error_code: "DISPATCH_FAILED",
           error_message: message.slice(0, 500),
+          completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        })
-        .eq("id", job.id);
+        }))
+        .eq("id", mediaJob.id)
+        .eq("status", "dispatching");
       return response({ error: message }, 502);
     }
   }),

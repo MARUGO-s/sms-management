@@ -9,7 +9,12 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
-export function createCropPlan(sourceWidth, sourceHeight, config) {
+export function createCropPlan(
+  sourceWidth,
+  sourceHeight,
+  config,
+  outputOverride = null,
+) {
   if (!Number.isFinite(sourceWidth) || sourceWidth <= 0) {
     throw new Error("Invalid source width");
   }
@@ -17,8 +22,16 @@ export function createCropPlan(sourceWidth, sourceHeight, config) {
     throw new Error("Invalid source height");
   }
 
-  const output = outputByAspect[config.aspect];
+  const output = outputOverride ?? outputByAspect[config.aspect];
   if (!output) throw new Error("Unsupported crop aspect");
+  if (
+    !Number.isFinite(output.width) ||
+    output.width <= 0 ||
+    !Number.isFinite(output.height) ||
+    output.height <= 0
+  ) {
+    throw new Error("Invalid output dimensions");
+  }
 
   const zoom = clamp(Number(config.zoom) || 100, 100, 200) / 100;
   const positionX = clamp(Number(config.positionX) || 50, 0, 100) / 100;

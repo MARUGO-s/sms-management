@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test crop-plan.test.mjs encoding-plan.test.mjs"
   }
 }

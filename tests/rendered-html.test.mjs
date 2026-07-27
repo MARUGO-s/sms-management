@@ -110,8 +110,15 @@ test("store affiliation, administrator schedules, and knowledge maps remain wire
   assert.match(agentRules, /Obsidian/);
 });
 
-test("video crop jobs keep originals and use the protected worker flow", async () => {
-  const [consoleSource, editorSource, migrationSource, workerSource] =
+test("video crop jobs keep originals and recover stale dispatches safely", async () => {
+  const [
+    consoleSource,
+    editorSource,
+    migrationSource,
+    recoveryMigration,
+    workerSource,
+    dispatcherSource,
+  ] =
     await Promise.all([
       readFile(new URL("../app/social-console.tsx", import.meta.url), "utf8"),
       readFile(new URL("../app/media-editor.tsx", import.meta.url), "utf8"),
@@ -123,7 +130,18 @@ test("video crop jobs keep originals and use the protected worker flow", async (
         "utf8",
       ),
       readFile(
+        new URL(
+          "../supabase/migrations/20260727152027_add_media_job_dispatching_state.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
         new URL("../workers/media-processor/processor.mjs", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../supabase/functions/media-jobs/index.ts", import.meta.url),
         "utf8",
       ),
     ]);
@@ -131,9 +149,16 @@ test("video crop jobs keep originals and use the protected worker flow", async (
   assert.match(consoleSource, /動画をクロップ|クロップ設定/);
   assert.match(consoleSource, /media-jobs/);
   assert.match(consoleSource, /処理を再実行/);
+  assert.match(consoleSource, /停止した処理を再実行/);
   assert.match(editorSource, /"1:1".*"4:5".*"9:16".*"16:9"/s);
   assert.match(migrationSource, /create table public\.social_media_jobs/);
   assert.match(migrationSource, /media_variant/);
+  assert.match(recoveryMigration, /'dispatching'/);
   assert.match(workerSource, /generated_from_file_id/);
   assert.match(workerSource, /libx264/);
+  assert.match(workerSource, /x-upsert": "true"/);
+  assert.match(workerSource, /createEncodingPlan/);
+  assert.match(workerSource, /Processed video exceeds the 50 MB limit/);
+  assert.match(dispatcherSource, /staleAfterMs/);
+  assert.match(dispatcherSource, /status: "dispatching"/);
 });

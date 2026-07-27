@@ -5,7 +5,7 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY package.json crop-plan.mjs processor.mjs ./
+COPY package.json crop-plan.mjs encoding-plan.mjs processor.mjs ./
 
 USER node
 CMD ["node", "processor.mjs"]

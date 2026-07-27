@@ -99,11 +99,13 @@ type SavedFile = {
     status: MediaJobStatus;
     aspect: string;
     errorMessage: string;
+    stale: boolean;
   } | null;
 };
 
 type MediaJobStatus =
   | "queued"
+  | "dispatching"
   | "processing"
   | "completed"
   | "failed"
@@ -116,7 +118,18 @@ type MediaJobRow = {
   status: MediaJobStatus;
   crop_config: MediaCropConfig;
   error_message: string;
+  updated_at: string;
 };
+
+const mediaJobStaleAfterMs = 20 * 60 * 1000;
+
+function isMediaJobStale(updatedAt: string) {
+  const timestamp = Date.parse(updatedAt);
+  return (
+    !Number.isFinite(timestamp) ||
+    Date.now() - timestamp >= mediaJobStaleAfterMs
+  );
+}
 
 function getAuthRedirectUrl() {
   const basePath = process.env.NEXT_PUBLIC_APP_BASE_PATH ?? "";
@@ -650,7 +663,7 @@ export default function SocialConsole() {
           supabase
             .from("social_media_jobs")
             .select(
-              "id, source_file_id, output_file_id, status, crop_config, error_message",
+              "id, source_file_id, output_file_id, status, crop_config, error_message, updated_at",
             )
             .eq("workspace_id", activeWorkspace.id)
             .order("created_at", { ascending: false }),
@@ -694,6 +707,9 @@ export default function SocialConsole() {
                     mediaJobByFileId.get(file.id)!.crop_config.aspect,
                   errorMessage:
                     mediaJobByFileId.get(file.id)!.error_message,
+                  stale: isMediaJobStale(
+                    mediaJobByFileId.get(file.id)!.updated_at,
+                  ),
                 }
               : null,
           })),
@@ -2088,6 +2104,8 @@ export default function SocialConsole() {
                                 {file.variant === "processed" && " / 変換済み"}
                                 {file.mediaJob?.status === "queued" &&
                                   ` / ${file.mediaJob.aspect} 処理待ち`}
+                                {file.mediaJob?.status === "dispatching" &&
+                                  ` / ${file.mediaJob.aspect} 起動待ち`}
                                 {file.mediaJob?.status === "processing" &&
                                   ` / ${file.mediaJob.aspect} 処理中`}
                                 {file.mediaJob?.status === "failed" &&
@@ -2098,9 +2116,13 @@ export default function SocialConsole() {
                           </button>
                           {file.variant === "original" &&
                             file.mediaJob &&
-                            ["queued", "failed"].includes(
+                            (["queued", "failed"].includes(
                               file.mediaJob.status,
-                            ) && (
+                            ) ||
+                              (["dispatching", "processing"].includes(
+                                file.mediaJob.status,
+                              ) &&
+                                file.mediaJob.stale)) && (
                               <button
                                 className="media-job-retry"
                                 disabled={
@@ -2120,7 +2142,11 @@ export default function SocialConsole() {
                                 ) : (
                                   <RefreshCcw aria-hidden="true" size={14} />
                                 )}
-                                <span>処理を再実行</span>
+                                <span>
+                                  {file.mediaJob.stale
+                                    ? "停止した処理を再実行"
+                                    : "処理を再実行"}
+                                </span>
                               </button>
                             )}
                         </div>

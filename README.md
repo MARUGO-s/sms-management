@@ -123,6 +123,8 @@ npm run worker:docker:check
 
 このコマンドは`linux/amd64`イメージbuild、Node・FFmpeg・libx264・非root実行、crop-planテストに加え、実際の短いテスト動画を9:16のH.264/AAC MP4（1080×1920）へ変換して`ffprobe`で検証します。プラットフォームを変える場合は`MEDIA_WORKER_DOCKER_PLATFORM`を指定します。Docker Desktopで他アプリのSupabaseコンテナが動作している場合、それらを停止・再作成せず、Instatic TalksXのワーカーイメージだけを独立して検証します。
 
+Cloud Run workerは動画時間から出力ビットレートを計算し、処理済みMP4をSupabase Freeの50MB上限内へ収めます。短い動画は通常解像度を維持し、長尺動画は必要な場合だけ720ベースへ縮小します。Cloud Runへの依頼受付後は`dispatching`、worker開始後は`processing`となり、20分以上更新されない処理は履歴から安全に再実行できます。
+
 ## Supabase
 
 ```bash

@@ -2,22 +2,27 @@ import { spawn } from "node:child_process";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createCropPlan } from "./crop-plan.mjs";
+import { createEncodingPlan } from "./encoding-plan.mjs";
 
-const required = ["SUPABASE_URL", "SUPABASE_SECRET_KEY", "MEDIA_JOB_ID"];
-for (const name of required) {
-  if (!process.env[name]) throw new Error(`${name} is required`);
+const storageFileSizeLimit = 50 * 1024 * 1024;
+
+function runtimeConfig() {
+  const required = ["SUPABASE_URL", "SUPABASE_SECRET_KEY", "MEDIA_JOB_ID"];
+  for (const name of required) {
+    if (!process.env[name]) throw new Error(`${name} is required`);
+  }
+  return {
+    supabaseUrl: process.env.SUPABASE_URL.replace(/\/$/, ""),
+    secretKey: process.env.SUPABASE_SECRET_KEY,
+    jobId: process.env.MEDIA_JOB_ID,
+    bucket: process.env.MEDIA_BUCKET || "post-files",
+  };
 }
 
-const supabaseUrl = process.env.SUPABASE_URL.replace(/\/$/, "");
-const secretKey = process.env.SUPABASE_SECRET_KEY;
-const jobId = process.env.MEDIA_JOB_ID;
-const bucket = process.env.MEDIA_BUCKET || "post-files";
-const workspaceDir = join("/tmp", `media-${jobId}`);
-
-function apiHeaders(extra = {}) {
+function apiHeaders(config, extra = {}) {
   return {
-    apikey: secretKey,
-    authorization: `Bearer ${secretKey}`,
+    apikey: config.secretKey,
+    authorization: `Bearer ${config.secretKey}`,
     ...extra,
   };
 }
@@ -26,10 +31,10 @@ function encodeObjectPath(path) {
   return path.split("/").map(encodeURIComponent).join("/");
 }
 
-async function rest(path, options = {}) {
-  const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, {
+async function rest(config, path, options = {}) {
+  const response = await fetch(`${config.supabaseUrl}/rest/v1/${path}`, {
     ...options,
-    headers: apiHeaders({
+    headers: apiHeaders(config, {
       "content-type": "application/json",
       ...(options.headers || {}),
     }),
@@ -42,8 +47,8 @@ async function rest(path, options = {}) {
   return response.json();
 }
 
-async function updateJob(values) {
-  await rest(`social_media_jobs?id=eq.${encodeURIComponent(jobId)}`, {
+async function updateJob(config, values) {
+  await rest(config, `social_media_jobs?id=eq.${encodeURIComponent(config.jobId)}`, {
     method: "PATCH",
     headers: { prefer: "return=minimal" },
     body: JSON.stringify({
@@ -76,7 +81,7 @@ async function probeVideo(inputPath) {
       "-select_streams",
       "v:0",
       "-show_entries",
-      "stream=width,height",
+      "stream=width,height:format=duration",
       "-of",
       "json",
       inputPath,
@@ -100,17 +105,28 @@ async function probeVideo(inputPath) {
   if (!stream?.width || !stream?.height) {
     throw new Error("Video dimensions could not be detected");
   }
-  return { width: Number(stream.width), height: Number(stream.height) };
+  const duration = Number(parsed.format?.duration);
+  if (!Number.isFinite(duration) || duration <= 0) {
+    throw new Error("Video duration could not be detected");
+  }
+  return {
+    width: Number(stream.width),
+    height: Number(stream.height),
+    duration,
+  };
 }
 
-async function processJob() {
+async function processJob(config) {
+  const workspaceDir = join("/tmp", `media-${config.jobId}`);
   const [job] = await rest(
-    `social_media_jobs?id=eq.${encodeURIComponent(jobId)}&select=*`,
+    config,
+    `social_media_jobs?id=eq.${encodeURIComponent(config.jobId)}&select=*`,
   );
   if (!job) throw new Error("Media job not found");
   if (job.status === "completed" || job.status === "cancelled") return;
 
   const [source] = await rest(
+    config,
     `social_post_files?id=eq.${encodeURIComponent(job.source_file_id)}&select=*`,
   );
   if (!source) throw new Error("Source file not found");
@@ -118,7 +134,7 @@ async function processJob() {
     throw new Error("Only video inputs are supported");
   }
 
-  await updateJob({
+  await updateJob(config, {
     status: "processing",
     error_code: "",
     error_message: "",
@@ -126,109 +142,153 @@ async function processJob() {
     attempts: Number(job.attempts || 0) + 1,
   });
 
-  await mkdir(workspaceDir, { recursive: true });
-  const inputPath = join(workspaceDir, "input-video");
-  const outputPath = join(workspaceDir, "output.mp4");
-  const sourceResponse = await fetch(
-    `${supabaseUrl}/storage/v1/object/authenticated/${encodeURIComponent(bucket)}/${encodeObjectPath(source.storage_path)}`,
-    { headers: apiHeaders() },
-  );
-  if (!sourceResponse.ok) {
-    throw new Error(`Source download failed (${sourceResponse.status})`);
-  }
-  await writeFile(inputPath, Buffer.from(await sourceResponse.arrayBuffer()));
-
-  const dimensions = await probeVideo(inputPath);
-  const plan = createCropPlan(
-    dimensions.width,
-    dimensions.height,
-    job.crop_config,
-  );
-
-  await run("ffmpeg", [
-    "-hide_banner",
-    "-y",
-    "-i",
-    inputPath,
-    "-vf",
-    plan.filter,
-    "-c:v",
-    "libx264",
-    "-preset",
-    "medium",
-    "-crf",
-    "23",
-    "-maxrate",
-    "2600k",
-    "-bufsize",
-    "5200k",
-    "-pix_fmt",
-    "yuv420p",
-    "-c:a",
-    "aac",
-    "-b:a",
-    "128k",
-    "-movflags",
-    "+faststart",
-    outputPath,
-  ]);
-
   const storagePath =
     `${job.workspace_id}/${job.post_id}/processed/${job.id}.mp4`;
-  const outputBytes = await readFile(outputPath);
-  const uploadResponse = await fetch(
-    `${supabaseUrl}/storage/v1/object/${encodeURIComponent(bucket)}/${encodeObjectPath(storagePath)}`,
-    {
-      method: "POST",
-      headers: apiHeaders({
-        "content-type": "video/mp4",
-        "x-upsert": "false",
-      }),
-      body: outputBytes,
-    },
+  const [existingOutput] = await rest(
+    config,
+    `social_post_files?storage_path=eq.${encodeURIComponent(storagePath)}&select=id`,
   );
-  if (!uploadResponse.ok) {
-    throw new Error(`Output upload failed (${uploadResponse.status})`);
+  if (existingOutput) {
+    await updateJob(config, {
+      status: "completed",
+      output_file_id: existingOutput.id,
+      output_storage_path: storagePath,
+      completed_at: new Date().toISOString(),
+    });
+    return;
   }
 
-  const fileInfo = await stat(outputPath);
-  const outputName =
-    `${source.file_name.replace(/\.[^.]+$/, "")}-${job.crop_config.aspect.replace(":", "x")}.mp4`;
-  const [outputFile] = await rest("social_post_files", {
-    method: "POST",
-    headers: { prefer: "return=representation" },
-    body: JSON.stringify({
-      workspace_id: job.workspace_id,
-      post_id: job.post_id,
-      storage_path: storagePath,
-      file_name: outputName,
-      content_type: "video/mp4",
-      file_size: fileInfo.size,
-      created_by: job.requested_by,
-      media_variant: "processed",
-      generated_from_file_id: source.id,
-    }),
-  });
+  try {
+    await mkdir(workspaceDir, { recursive: true });
+    const inputPath = join(workspaceDir, "input-video");
+    const outputPath = join(workspaceDir, "output.mp4");
+    const sourceResponse = await fetch(
+      `${config.supabaseUrl}/storage/v1/object/authenticated/${encodeURIComponent(config.bucket)}/${encodeObjectPath(source.storage_path)}`,
+      { headers: apiHeaders(config) },
+    );
+    if (!sourceResponse.ok) {
+      const message = await sourceResponse.text();
+      throw new Error(
+        `Source download failed (${sourceResponse.status}): ${message.slice(0, 300)}`,
+      );
+    }
+    await writeFile(inputPath, Buffer.from(await sourceResponse.arrayBuffer()));
 
-  await updateJob({
-    status: "completed",
-    output_file_id: outputFile.id,
-    output_storage_path: storagePath,
-    completed_at: new Date().toISOString(),
-  });
+    const dimensions = await probeVideo(inputPath);
+    const encoding = createEncodingPlan(
+      dimensions.duration,
+      job.crop_config.aspect,
+      storageFileSizeLimit,
+    );
+    const plan = createCropPlan(
+      dimensions.width,
+      dimensions.height,
+      job.crop_config,
+      encoding.output,
+    );
+
+    await run("ffmpeg", [
+      "-hide_banner",
+      "-y",
+      "-i",
+      inputPath,
+      "-vf",
+      plan.filter,
+      "-c:v",
+      "libx264",
+      "-preset",
+      "medium",
+      "-b:v",
+      `${encoding.videoKbps}k`,
+      "-maxrate",
+      `${encoding.maxrateKbps}k`,
+      "-bufsize",
+      `${encoding.bufsizeKbps}k`,
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      "-b:a",
+      `${encoding.audioKbps}k`,
+      "-movflags",
+      "+faststart",
+      outputPath,
+    ]);
+
+    const outputBytes = await readFile(outputPath);
+    if (outputBytes.length > storageFileSizeLimit) {
+      throw new Error(
+        `Processed video exceeds the 50 MB limit (${outputBytes.length} bytes)`,
+      );
+    }
+    const uploadResponse = await fetch(
+      `${config.supabaseUrl}/storage/v1/object/${encodeURIComponent(config.bucket)}/${encodeObjectPath(storagePath)}`,
+      {
+        method: "POST",
+        headers: apiHeaders(config, {
+          "content-type": "video/mp4",
+          "x-upsert": "true",
+        }),
+        body: outputBytes,
+      },
+    );
+    if (!uploadResponse.ok) {
+      const message = await uploadResponse.text();
+      throw new Error(
+        `Output upload failed (${uploadResponse.status}): ${message.slice(0, 300)}`,
+      );
+    }
+
+    const fileInfo = await stat(outputPath);
+    const outputName =
+      `${source.file_name.replace(/\.[^.]+$/, "")}-${job.crop_config.aspect.replace(":", "x")}.mp4`;
+    const [outputFile] = await rest(
+      config,
+      "social_post_files?on_conflict=storage_path",
+      {
+      method: "POST",
+      headers: {
+        prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify({
+        workspace_id: job.workspace_id,
+        post_id: job.post_id,
+        storage_path: storagePath,
+        file_name: outputName,
+        content_type: "video/mp4",
+        file_size: fileInfo.size,
+        created_by: job.requested_by,
+        media_variant: "processed",
+        generated_from_file_id: source.id,
+      }),
+      },
+    );
+
+    await updateJob(config, {
+      status: "completed",
+      output_file_id: outputFile.id,
+      output_storage_path: storagePath,
+      completed_at: new Date().toISOString(),
+    });
+  } finally {
+    await rm(workspaceDir, { recursive: true, force: true });
+  }
 }
 
+let config;
 try {
-  await processJob();
+  config = runtimeConfig();
+  await processJob(config);
 } catch (error) {
   const message = error instanceof Error ? error.message : "Media processing failed";
-  await updateJob({
-    status: "failed",
-    error_code: "PROCESSING_FAILED",
-    error_message: message.slice(0, 500),
-    completed_at: new Date().toISOString(),
-  }).catch(() => undefined);
+  if (config) {
+    await updateJob(config, {
+      status: "failed",
+      error_code: "PROCESSING_FAILED",
+      error_message: message.slice(0, 500),
+      completed_at: new Date().toISOString(),
+    }).catch(() => undefined);
+  }
+  console.error(message);
   throw error;
-} finally {
-  await rm(workspaceDir, { recursive: true, force: true });
 }
