@@ -3,6 +3,10 @@ import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createCropPlan } from "./crop-plan.mjs";
 import { createEncodingPlan } from "./encoding-plan.mjs";
+import {
+  createTimelineFilter,
+  createTimelinePlan,
+} from "./timeline-plan.mjs";
 
 const storageFileSizeLimit = 50 * 1024 * 1024;
 
@@ -78,10 +82,8 @@ async function probeVideo(inputPath) {
     const child = spawn("ffprobe", [
       "-v",
       "error",
-      "-select_streams",
-      "v:0",
       "-show_entries",
-      "stream=width,height:format=duration",
+      "stream=codec_type,width,height:format=duration",
       "-of",
       "json",
       inputPath,
@@ -101,7 +103,7 @@ async function probeVideo(inputPath) {
     });
   });
   const parsed = JSON.parse(output);
-  const stream = parsed.streams?.[0];
+  const stream = parsed.streams?.find((item) => item.codec_type === "video");
   if (!stream?.width || !stream?.height) {
     throw new Error("Video dimensions could not be detected");
   }
@@ -113,6 +115,9 @@ async function probeVideo(inputPath) {
     width: Number(stream.width),
     height: Number(stream.height),
     duration,
+    hasAudio: Boolean(
+      parsed.streams?.some((item) => item.codec_type === "audio"),
+    ),
   };
 }
 
@@ -175,8 +180,9 @@ async function processJob(config) {
     await writeFile(inputPath, Buffer.from(await sourceResponse.arrayBuffer()));
 
     const dimensions = await probeVideo(inputPath);
+    const timeline = createTimelinePlan(dimensions.duration, job.crop_config);
     const encoding = createEncodingPlan(
-      dimensions.duration,
+      timeline.outputDuration,
       job.crop_config.aspect,
       storageFileSizeLimit,
     );
@@ -186,14 +192,21 @@ async function processJob(config) {
       job.crop_config,
       encoding.output,
     );
+    const timelineFilter = createTimelineFilter(
+      timeline,
+      plan.filter,
+      dimensions.hasAudio,
+    );
 
-    await run("ffmpeg", [
+    const ffmpegArgs = [
       "-hide_banner",
       "-y",
       "-i",
       inputPath,
-      "-vf",
-      plan.filter,
+      "-filter_complex",
+      timelineFilter.filter,
+      "-map",
+      timelineFilter.videoMap,
       "-c:v",
       "libx264",
       "-preset",
@@ -206,14 +219,23 @@ async function processJob(config) {
       `${encoding.bufsizeKbps}k`,
       "-pix_fmt",
       "yuv420p",
-      "-c:a",
-      "aac",
-      "-b:a",
-      `${encoding.audioKbps}k`,
       "-movflags",
       "+faststart",
-      outputPath,
-    ]);
+    ];
+    if (timelineFilter.audioMap) {
+      ffmpegArgs.push(
+        "-map",
+        timelineFilter.audioMap,
+        "-c:a",
+        "aac",
+        "-b:a",
+        `${encoding.audioKbps}k`,
+      );
+    } else {
+      ffmpegArgs.push("-an");
+    }
+    ffmpegArgs.push(outputPath);
+    await run("ffmpeg", ffmpegArgs);
 
     const outputBytes = await readFile(outputPath);
     if (outputBytes.length > storageFileSizeLimit) {
@@ -241,7 +263,7 @@ async function processJob(config) {
 
     const fileInfo = await stat(outputPath);
     const outputName =
-      `${source.file_name.replace(/\.[^.]+$/, "")}-${job.crop_config.aspect.replace(":", "x")}.mp4`;
+      `${source.file_name.replace(/\.[^.]+$/, "")}-edited-${job.crop_config.aspect.replace(":", "x")}.mp4`;
     const [outputFile] = await rest(
       config,
       "social_post_files?on_conflict=storage_path",

@@ -1,7 +1,7 @@
 # Cloud Run Media Processor
 
-`media-processor` is a one-task Cloud Run Job that crops a video with FFmpeg,
-creates a social-platform-sized MP4, uploads it to the private Supabase
+`media-processor` is a one-task Cloud Run Job that trims, cuts, and crops a
+video with FFmpeg, creates a social-platform-sized MP4, uploads it to private Supabase
 `post-files` bucket, and updates `social_media_jobs`.
 
 The source video is never overwritten. The processed file is inserted as a new
@@ -16,6 +16,10 @@ The source video is never overwritten. The processed file is inserted as a new
 - The history screen can retry a queued or failed job.
 - The worker targets one task at a time and a 15-minute timeout.
 - The current worker supports video input and MP4 output.
+- Optional `startTime`, `endTime`, and up to 32 intermediate cut ranges are
+  normalized before FFmpeg runs. Overlapping cuts merge, out-of-window cuts are
+  clipped, and at least 0.5 seconds must remain.
+- The worker preserves audio when present and supports video-only sources.
 - Output bitrate is calculated from source duration so the processed file stays
   below the 50 MB Storage limit. Short videos keep the normal output
   resolution; long videos use a compact 720-based output when required.
@@ -131,10 +135,11 @@ supabase functions deploy media-jobs \
 6. Refresh history and download the new processed MP4.
 7. Confirm the original file still exists.
 
-Run the crop and encoding calculation tests locally:
+Run the crop, encoding, and timeline calculation tests locally:
 
 ```bash
 node --test \
   workers/media-processor/crop-plan.test.mjs \
-  workers/media-processor/encoding-plan.test.mjs
+  workers/media-processor/encoding-plan.test.mjs \
+  workers/media-processor/timeline-plan.test.mjs
 ```

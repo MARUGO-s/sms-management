@@ -10,8 +10,8 @@ Instagram、TikTok、X、Threadsの投稿予約、履歴、添付ファイル、
 - 店舗・ワークスペース単位の投稿予約と履歴保存
 - 非公開Supabase Storageへのファイル保存と期限付きダウンロード
 - 履歴の動画をダウンロードせずアプリ内プレーヤーで再生
-- 1:1、4:5、9:16、16:9の動画クロップ設定と処理履歴
-- 元動画を保持したままCloud Run Jobsでクロップ済みMP4を生成する非同期処理
+- 1:1、4:5、9:16、16:9のクロップ、開始・終了調整、複数の途中カット
+- 元動画を保持したままCloud Run Jobsで編集済みMP4を生成する非同期処理
 - SNS APIの公開設定と秘密情報の分離保存
 - RLSによる利用者・ワークスペース単位のアクセス制御
 - 通常の運用画面で現在の所属店舗を常時表示
@@ -122,7 +122,7 @@ Cloud Run向けメディアワーカーはDocker Desktopでローカル検証で
 npm run worker:docker:check
 ```
 
-このコマンドは`linux/amd64`イメージbuild、Node・FFmpeg・libx264・非root実行、crop-planテストに加え、実際の短いテスト動画を9:16のH.264/AAC MP4（1080×1920）へ変換して`ffprobe`で検証します。プラットフォームを変える場合は`MEDIA_WORKER_DOCKER_PLATFORM`を指定します。Docker Desktopで他アプリのSupabaseコンテナが動作している場合、それらを停止・再作成せず、Instatic TalksXのワーカーイメージだけを独立して検証します。
+このコマンドは`linux/amd64`イメージbuild、Node・FFmpeg・libx264・非root実行、crop・encoding・timeline planテストに加え、実MP4のクロップ、前後トリム、途中カットを音声あり／なしの両方で`ffprobe`検証します。プラットフォームを変える場合は`MEDIA_WORKER_DOCKER_PLATFORM`を指定します。Docker Desktopで他アプリのSupabaseコンテナが動作している場合、それらを停止・再作成せず、Instatic TalksXのワーカーイメージだけを独立して検証します。
 
 Cloud Run workerは動画時間から出力ビットレートを計算し、処理済みMP4をSupabase Freeの50MB上限内へ収めます。短い動画は通常解像度を維持し、長尺動画は必要な場合だけ720ベースへ縮小します。Cloud Runへの依頼受付後は`dispatching`、worker開始後は`processing`となり、20分以上更新されない処理は履歴から安全に再実行できます。
 
@@ -137,7 +137,7 @@ supabase db advisors --linked --type all --level warn --fail-on none
 
 データベース変更は必ず `supabase migration new <name>` で作成し、`supabase/migrations/` をGitへ保存します。
 
-動画クロップの画面・ジョブ登録・処理履歴はSupabase Freeで利用できます。実際のFFmpeg処理には別途Cloud Run Jobの接続が必要です。接続前の処理は`queued`として残り、履歴から再実行できます。Cloud Runの設定手順は`workers/media-processor/README.md`にあります。
+動画編集画面では、動画を添付して「動画編集」を押すと、縦横比・位置・拡大に加え、開始・終了、複数の途中カットを0.1秒単位で指定できます。実際のFFmpeg処理にはCloud Run Jobを使用します。接続前の処理は`queued`として残り、履歴から再実行できます。Cloud Runの設定手順は`workers/media-processor/README.md`にあります。
 
 ## Backup
 

@@ -31,7 +31,7 @@ The legacy OpenAI Sites deployment remains available as a secondary preview only
   temporary signed Storage URL only when the user opens a video; original and
   processed videos remain private, and the separate download action remains
   available.
-- Video crop settings support 1:1, 4:5, 9:16, and 16:9. The source is preserved, `social_media_jobs` records the asynchronous state, and processed MP4 files are added as separate `social_post_files` rows.
+- Video editing supports 1:1, 4:5, 9:16, and 16:9 crop settings, start/end trimming, and multiple intermediate cut ranges. Overlapping cuts are normalized, preview playback skips cut ranges, the source is preserved, and the edited MP4 is added as a separate `social_post_files` row.
 - The `media-jobs` Edge Function dispatches Cloud Run Jobs. Without Google Cloud secrets it safely returns `configured: false` and leaves the job queued. Users can retry queued or failed jobs from history.
 - The FFmpeg worker is in `workers/media-processor/`. Its deployment and secret setup are documented in `workers/media-processor/README.md`.
 - SNS secrets are written only through the authenticated `integration-secrets` Edge Function. Browser clients never read stored secret values.
@@ -114,6 +114,19 @@ The migration `20260726130739_add_social_store_affiliation.sql` creates the 23-s
 
 The migrations `20260726135609_add_social_media_processing.sql` and `20260726141243_fix_media_job_rls_qualification.sql` add Free-plan media limits, original/processed file lineage, asynchronous crop jobs, strict same-workspace/source-file RLS, and service-role worker access.
 
+The migration `20260727171106_add_media_timeline_editing.sql` validates optional
+timeline fields stored in `crop_config`: non-negative start time, at least
+0.5 seconds between start/end, up to 32 cut ranges, and cuts of at least
+0.1 seconds. Old crop-only jobs remain valid.
+
+The migration `20260727204751_harden_media_timeline_validation.sql` is an
+idempotent validation hardening pass.
+
+The migration `20260728040605_enforce_media_timeline_remaining_duration.sql`
+adds the final server-side guard: after sorting and merging overlapping cut
+ranges, at least 0.5 seconds must remain inside the selected start/end window.
+All three timeline migrations are applied in production.
+
 ## 2026-07-28 Cloud Run status
 
 Cloud Run media processing has now been configured. Do not repeat the setup blindly.
@@ -143,6 +156,19 @@ compact 720-based dimensions for long videos when needed, and rejects videos
 that cannot fit at a safe minimum quality. Jobs use
 `queued -> dispatching -> processing`, stale active jobs can be recovered after
 20 minutes, and worker output writes are idempotent.
+
+Timeline editing is deployed to the same Cloud Run Job. The worker image is
+pinned to digest
+`sha256:74ae97bc5705d8704c695b147edcc79053517c8c2607ca257a66f5dc97b0945b`
+and was smoke-tested against the existing completed crop-only job for backward
+compatibility. Docker verification creates real audio and
+video-only inputs, applies start/end trim plus a middle cut, and confirms
+3.0-second and 1.5-second outputs respectively.
+
+Production E2E verification reused the existing source without modifying it:
+start 1s, end 5s, and cut 2s-3s produced a 3.003-second H.264/AAC 1080x1920
+MP4. The temporary Storage object, media job, file row, and audit rows were
+removed afterward; the original and existing completed job remain.
 
 The service-account JSON was used to create the Supabase Edge Function secret and then removed from Cloud Shell. The local downloaded copy should be removed from the Mac Downloads folder. Never place the JSON, Supabase secret key, Google key, SNS secrets, or any secret values in Git, this file, `PROJECT_PROGRESS.md`, Dropbox source mirror, chat, or screenshots.
 

@@ -10,7 +10,6 @@ import {
   CheckCircle2,
   Clock3,
   Cloud,
-  Crop,
   Database,
   Download,
   Eye,
@@ -30,6 +29,7 @@ import {
   RefreshCcw,
   Save,
   Search,
+  Scissors,
   Send,
   Settings2,
   ShieldCheck,
@@ -287,6 +287,13 @@ function formatFileSize(size: number) {
     return `${Math.max(1, Math.round(size / 1024))} KB`;
   }
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDateTimeDuration(value: number) {
+  const safe = Math.max(0, Number.isFinite(value) ? Math.round(value) : 0);
+  const minutes = Math.floor(safe / 60);
+  const seconds = safe % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
 function getStatusLabel(status: DbPostRow["status"]): RecordStatus {
@@ -1832,19 +1839,33 @@ export default function SocialConsole() {
                           {file.crop && (
                             <em>
                               {file.crop.aspect} / 拡大{file.crop.zoom}%
+                              {file.crop.endTime != null &&
+                                ` / ${formatDateTimeDuration(
+                                  Math.max(
+                                    0,
+                                    file.crop.endTime -
+                                      (file.crop.startTime ?? 0) -
+                                      (file.crop.cuts ?? []).reduce(
+                                        (total, cut) =>
+                                          total + Math.max(0, cut.end - cut.start),
+                                        0,
+                                      ),
+                                  ),
+                                )}`}
                             </em>
                           )}
                         </span>
                         <small>{formatFileSize(file.size)}</small>
                         {file.type.startsWith("video/") && (
                           <button
-                            aria-label={`${file.name}のクロップ設定`}
+                            aria-label={`${file.name}の動画編集`}
                             className="attachment-edit-button"
                             onClick={() => setEditingAttachmentId(file.id)}
-                            title="クロップ設定"
+                            title="動画編集"
                             type="button"
                           >
-                            <Crop aria-hidden="true" size={14} />
+                            <Scissors aria-hidden="true" size={14} />
+                            <span>動画編集</span>
                           </button>
                         )}
                         <button
@@ -1862,7 +1883,7 @@ export default function SocialConsole() {
                   ) && (
                     <p className="media-processing-note">
                       <Cloud aria-hidden="true" size={15} />
-                      元動画を保持し、クロップ済みMP4をバックグラウンドで生成します。
+                      元動画を保持し、カット・時間調整・クロップを反映したMP4をバックグラウンドで生成します。
                     </p>
                   )}
                 </>
@@ -2165,7 +2186,7 @@ export default function SocialConsole() {
                                 {formatFileSize(file.size)}
                                 {file.type.startsWith("video/") &&
                                   " / アプリ内再生"}
-                                {file.variant === "processed" && " / 変換済み"}
+                                {file.variant === "processed" && " / 編集済み"}
                                 {file.mediaJob?.status === "queued" &&
                                   ` / ${file.mediaJob.aspect} 処理待ち`}
                                 {file.mediaJob?.status === "dispatching" &&
@@ -2632,7 +2653,7 @@ export default function SocialConsole() {
           onDownload={() => void downloadFile(videoViewer.file)}
           url={videoViewer.url}
           variantLabel={
-            videoViewer.file.variant === "processed" ? "変換済み" : "元動画"
+            videoViewer.file.variant === "processed" ? "編集済み" : "元動画"
           }
         />
       )}

@@ -110,7 +110,7 @@ test("store affiliation, administrator schedules, and knowledge maps remain wire
   assert.match(agentRules, /Obsidian/);
 });
 
-test("video files support in-app playback and crop jobs recover safely", async () => {
+test("video files support playback, timeline editing, and safe processing", async () => {
   const [
     consoleSource,
     editorSource,
@@ -119,6 +119,10 @@ test("video files support in-app playback and crop jobs recover safely", async (
     workerSource,
     dispatcherSource,
     viewerSource,
+    timelineSource,
+    timelineMigration,
+    timelineHardeningMigration,
+    timelineRemainingMigration,
   ] =
     await Promise.all([
       readFile(new URL("../app/social-console.tsx", import.meta.url), "utf8"),
@@ -146,14 +150,41 @@ test("video files support in-app playback and crop jobs recover safely", async (
         "utf8",
       ),
       readFile(new URL("../app/video-viewer.tsx", import.meta.url), "utf8"),
+      readFile(
+        new URL("../workers/media-processor/timeline-plan.mjs", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../supabase/migrations/20260727171106_add_media_timeline_editing.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../supabase/migrations/20260727204751_harden_media_timeline_validation.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../supabase/migrations/20260728040605_enforce_media_timeline_remaining_duration.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
     ]);
 
-  assert.match(consoleSource, /動画をクロップ|クロップ設定/);
+  assert.match(consoleSource, /動画編集/);
+  assert.match(consoleSource, /<span>動画編集<\/span>/);
   assert.match(consoleSource, /media-jobs/);
   assert.match(consoleSource, /処理を再実行/);
   assert.match(consoleSource, /停止した処理を再実行/);
   assert.match(consoleSource, /openVideoViewer/);
   assert.match(consoleSource, /アプリ内再生/);
+  assert.match(consoleSource, /編集済み/);
   assert.match(consoleSource, /createSignedUrl\(file\.storagePath, 60 \* 60\)/);
   assert.match(consoleSource, /videoRequestId/);
   assert.match(consoleSource, /<VideoViewer/);
@@ -163,6 +194,17 @@ test("video files support in-app playback and crop jobs recover safely", async (
   assert.match(viewerSource, /event\.key === "Escape"/);
   assert.match(viewerSource, /動画を読み込めませんでした/);
   assert.match(editorSource, /"1:1".*"4:5".*"9:16".*"16:9"/s);
+  assert.match(editorSource, /時間を編集/);
+  assert.match(editorSource, /途中をカット/);
+  assert.match(editorSource, /開始位置を調整/);
+  assert.match(editorSource, /終了位置を調整/);
+  assert.match(editorSource, /動画全体を削除するカットは追加できません/);
+  assert.match(editorSource, /終了は開始より後にしてください/);
+  assert.match(editorSource, /parseTimeInput/);
+  assert.match(editorSource, /プレビュー再生では途中カットを自動で飛ばします/);
+  assert.match(editorSource, /startTime/);
+  assert.match(editorSource, /endTime/);
+  assert.match(editorSource, /cuts/);
   assert.match(migrationSource, /create table public\.social_media_jobs/);
   assert.match(migrationSource, /media_variant/);
   assert.match(recoveryMigration, /'dispatching'/);
@@ -170,7 +212,17 @@ test("video files support in-app playback and crop jobs recover safely", async (
   assert.match(workerSource, /libx264/);
   assert.match(workerSource, /x-upsert": "true"/);
   assert.match(workerSource, /createEncodingPlan/);
+  assert.match(workerSource, /createTimelinePlan/);
+  assert.match(workerSource, /createTimelineFilter/);
   assert.match(workerSource, /Processed video exceeds the 50 MB limit/);
+  assert.match(timelineSource, /maximumCuts = 32/);
+  assert.match(timelineSource, /concat=n=/);
+  assert.match(timelineMigration, /is_valid_media_timeline_config/);
+  assert.match(timelineMigration, /jsonb_array_length/);
+  assert.match(timelineHardeningMigration, /is distinct from/);
+  assert.match(timelineHardeningMigration, /trim_end - trim_start < 0\.5/);
+  assert.match(timelineRemainingMigration, /removed_duration/);
+  assert.match(timelineRemainingMigration, /merged_end - merged_start/);
   assert.match(dispatcherSource, /staleAfterMs/);
   assert.match(dispatcherSource, /status: "dispatching"/);
 });
