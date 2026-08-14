@@ -1254,3 +1254,13 @@ supabase functions deploy media-jobs --use-api
 - 検証: ESLintの変更ファイルはerror 0。`node --test` 16件成功。`npm run knowledge:update` と `knowledge:check` 成功。Graphify 374ノード / 406関係 / 37コミュニティ。
 - 未完了事項: Redirect URLsを4行に分けて保存する作業はダッシュボード側。保存後にローカルでGoogleログインを再確認する。
 - 次の作業: Redirect URLs保存後、`http://localhost:3000/` でGoogleログインを確認する。
+
+### 2026-08-14 22:25 JST - ローカルGoogleログインを確認
+
+- 依頼: Redirect URLs修正後のログイン確認。
+- 実施内容: 利用者がSupabaseのRedirect URLsを4行に分けて保存し、`http://localhost:3000/` からGoogleログインできることを確認した。
+- 変更ファイル: なし。
+- DB・設定変更: Auth URL ConfigurationのRedirect URLsを別行へ分離（手動）。
+- 未完了事項: なし。
+- 次の作業: 利用者が指定する次の編集。
+
