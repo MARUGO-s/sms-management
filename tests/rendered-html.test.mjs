@@ -30,9 +30,7 @@ test("server-renders the Instatic TalksX operations console", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>Instatic TalksX<\/title>/i);
-  assert.match(html, /ログイン/);
-  assert.match(html, /Googleで続ける/);
-  assert.match(html, /業務データはアカウントごとに保護されます/);
+  assert.match(html, /安全な接続を確認しています/);
   assert.doesNotMatch(html, /Your site is taking shape|react-loading-skeleton/i);
 });
 
@@ -87,6 +85,15 @@ test("store affiliation, administrator schedules, and knowledge maps remain wire
 
   assert.match(consoleSource, /所属店舗/);
   assert.match(consoleSource, /social_store_id/);
+  assert.match(consoleSource, /Googleで続ける/);
+  assert.match(consoleSource, /業務データはアカウントごとに保護されます/);
+  assert.match(consoleSource, /readOAuthCallbackError/);
+  assert.match(consoleSource, /rollbackFailedSchedule/);
+  assert.match(consoleSource, /再予約/);
+  assert.match(consoleSource, /公開予定は現在より後の日時を指定してください/);
+  assert.match(consoleSource, /isFreshAuthUser/);
+  assert.match(adminSource, /公開予定日時がない投稿は予約済みにできません/);
+  assert.match(adminSource, /新しい1000件まで/);
   assert.match(adminSource, /予約予定/);
   assert.match(adminSource, /店舗別運用状況/);
   assert.match(adminSource, /全店舗/);

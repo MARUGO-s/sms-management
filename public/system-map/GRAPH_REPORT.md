@@ -1,15 +1,15 @@
-# Graph Report - .  (2026-07-29)
+# Graph Report - .  (2026-08-14)
 
 ## Corpus Check
 - cluster-only mode — file stats not available
 
 ## Summary
-- 364 nodes · 393 edges · 36 communities (25 shown, 11 thin omitted)
+- 374 nodes · 406 edges · 37 communities (25 shown, 12 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 1 edges (avg confidence: 0.5)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `be2a07d5`
+- Built from commit: `598ce7ac`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -47,19 +47,20 @@
 - Community 30
 - Community 31
 - Community 32
-- Community 34
+- Community 33
+- Community 35
 
 ## God Nodes (most connected - your core abstractions)
 1. `compilerOptions` - 16 edges
 2. `scripts` - 15 edges
 3. `include` - 7 edges
 4. `processJob()` - 7 edges
-5. `createTimelinePlan()` - 6 edges
-6. `MediaEditor()` - 6 edges
-7. `safeRelativeReturnPath()` - 4 edges
-8. `getDb()` - 4 edges
-9. `lib` - 4 edges
-10. `AdminConsole()` - 4 edges
+5. `SocialConsole()` - 7 edges
+6. `createTimelinePlan()` - 6 edges
+7. `MediaEditor()` - 6 edges
+8. `safeRelativeReturnPath()` - 4 edges
+9. `getDb()` - 4 edges
+10. `lib` - 4 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `GET()` --calls--> `getDb()`  [EXTRACTED]
@@ -70,11 +71,11 @@
 ## Import Cycles
 - None detected.
 
-## Communities (36 total, 11 thin omitted)
+## Communities (37 total, 12 thin omitted)
 
 ### Community 0 - "Community 0"
-Cohesion: 0.06
-Nodes (25): ApiStatus, channelById, ChannelId, channels, createDefaultIntegrations(), createIntegration(), DbPostRow, defaultScopes (+17 more)
+Cohesion: 0.05
+Nodes (30): ApiStatus, channelById, ChannelId, channels, clearAuthCallbackParams(), createDefaultIntegrations(), createIntegration(), DbPostRow (+22 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.06
@@ -165,21 +166,21 @@ Cohesion: 0.50
 Nodes (3): imports, @supabase/functions-js, @supabase/server
 
 ## Knowledge Gaps
-- **190 isolated node(s):** `ChatGPTUser`, `eslintConfig`, `config`, `backupRoot`, `tables` (+185 more)
+- **191 isolated node(s):** `ChatGPTUser`, `eslintConfig`, `config`, `backupRoot`, `tables` (+186 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **11 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **12 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `devDependencies` connect `Community 1` to `Community 6`?**
-  _High betweenness centrality (0.026) - this node is a cross-community bridge._
+  _High betweenness centrality (0.025) - this node is a cross-community bridge._
 - **Why does `dependencies` connect `Community 7` to `Community 6`?**
-  _High betweenness centrality (0.015) - this node is a cross-community bridge._
+  _High betweenness centrality (0.014) - this node is a cross-community bridge._
 - **What connects `ChatGPTUser`, `eslintConfig`, `config` to the rest of the system?**
-  _190 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _191 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.06190476190476191 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05391120507399577 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
   _Cohesion score 0.06060606060606061 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**

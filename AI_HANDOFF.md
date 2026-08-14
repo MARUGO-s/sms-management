@@ -75,7 +75,11 @@ The current production app safely stores users, reservations, history, files, an
 Email confirmation and Google OAuth are enabled. Supabase Dashboard > Authentication > URL Configuration must allow both deployments:
 
 - Site URL: `https://marugo-s.github.io/sms-management/`
-- Redirect URLs: `https://marugo-s.github.io/sms-management/**`, `https://instatic-talksx.yoshito0428.chatgpt.site/**`, and `http://localhost:3000/**`
+- Redirect URLs must be separate entries, never concatenated into one string:
+  `http://localhost:3000/**`, `http://127.0.0.1:3000/**`,
+  `https://marugo-s.github.io/sms-management/**`,
+  and `https://instatic-talksx.yoshito0428.chatgpt.site/**`
+- Site URL must be `https://marugo-s.github.io/sms-management/` with no `**`
 
 Before testing email confirmation, password reset, or Google OAuth on GitHub Pages, verify that the GitHub Pages wildcard redirect entry above has actually been added in the Supabase dashboard. It cannot be stored in source code or GitHub Actions.
 

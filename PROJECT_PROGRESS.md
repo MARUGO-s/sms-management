@@ -108,7 +108,7 @@ Instatic TalksXは、Instagram、TikTok、X、Threadsの運用情報を一括管
 
 知識環境の最新生成結果は326ノード、343関係、32コミュニティ。ObsidianのInstatic TalksX配下はMarkdown合計373件で、`90_Graphify/`はGraphify生成ノート358件 + 運用説明`_README.md` 1件 + `graph.canvas` + 生成manifestで構成される。`70_AI作業環境/`はAI入口・環境図・Canvas・チェックリスト・Graphify/Obsidianブリッジを含む8ファイル。
 
-現時点では実際のSNS公開処理、コメント・DM同期、Webhook受信、各SNSの分析値取得は未実装。各SNSの開発者アプリ審査、OAuth認可、公開API実装が別途必要。動画クロップの画面、キュー、Edge Function、FFmpegワーカーは実装済みで、Cloud Run実行環境も構築済み。2026-07-27 00:19 JST時点で9分16秒動画のジョブがアプリ上で処理中表示になっており、処理済みMP4への変換完了はまだ確認できていない。
+現時点では実際のSNS公開処理、コメント・DM同期、Webhook受信、各SNSの分析値取得は未実装。各SNSの開発者アプリ審査、OAuth認可、公開API実装が別途必要。動画クロップの画面、キュー、Edge Function、FFmpegワーカーは実装済みで、Cloud Run実行環境も構築済み。2026-07-28に処理中固定の障害は対応済み。2026-08-14にGoogle OAuthの戻り先誤設定、予約保存の巻き戻し、下書き再予約・削除、所属店舗の取り違え、管理者ステータス不整合を修正した。
 
 ### Cloud Run動画処理の実環境
 
@@ -1234,3 +1234,23 @@ supabase functions deploy media-jobs --use-api
 - 配布物: Dropbox正本HTML、macOSアプリ、Windows x64版ZIPを更新。Mac署名、Windows ZIP整合性、競合コピー0件を確認し、正本・Mac同梱・Windows `app.asar`同梱HTMLのSHA-256 `b9b7bb85d798bc28e4bae52d500d8530efea4d80a49cb746bff51ea03c99ea05`が一致した。
 - 知識: Obsidian「売上PDFレポート」へ会計時間帯の定義、客数根拠、3か月基準値、停止条件、保存互換、配布検証を追記。
 - DB・設定変更: なし。Instatic TalksX本体、Supabase、Cloud Run、GitHub Pages、OpenAI Sitesは変更していない。
+
+### 2026-08-14 22:10 JST - 認証と予約まわりのバグ修正
+
+- 依頼: 洗い出したバグを優先度順に直す。
+- 実施内容:
+  - Googleログイン後の`error` / `error_description`をログイン画面へ表示。
+  - 通常画面の初期`authLoading`を管理者画面と同様にtrueへ変更。
+  - 所属店舗の一時保存を新規登録15分以内だけ適用し、既存利用者へ別アカウントの店舗が付かないようにした。
+  - 予約保存が途中失敗したとき、Storageオブジェクトと投稿行を巻き戻す。
+  - 下書き・失敗投稿の再予約と削除を履歴詳細へ追加。
+  - 公開予定は現在より後の日時だけ受け付ける。
+  - SNS連携で秘密情報の保存に失敗したらメタデータを`incomplete`へ戻す。
+  - 管理者のステータス変更で、予約済みには予定日時必須、下書き／失敗では予定日時を消す。
+  - 管理一覧が1000件上限に達したら警告する。
+  - ファイル取得をポップアップではなくBlobダウンロードへ変更。
+- 変更ファイル: `app/social-console.tsx`、`app/admin/admin-console.tsx`、`app/globals.css`、`supabase/migrations/20260814133000_allow_post_delete_with_media_jobs.sql`、`tests/rendered-html.test.mjs`、`AI_HANDOFF.md`、`PROJECT_PROGRESS.md`。
+- DB・設定変更: migration `20260814133000_allow_post_delete_with_media_jobs.sql` を本番へ適用済み。`social_media_jobs.source_file_id` は `ON DELETE CASCADE`。Redirect URLsの分離はSupabase Dashboardの手動設定が必要。
+- 検証: ESLintの変更ファイルはerror 0。`node --test` 16件成功。`npm run knowledge:update` と `knowledge:check` 成功。Graphify 374ノード / 406関係 / 37コミュニティ。
+- 未完了事項: Redirect URLsを4行に分けて保存する作業はダッシュボード側。保存後にローカルでGoogleログインを再確認する。
+- 次の作業: Redirect URLs保存後、`http://localhost:3000/` でGoogleログインを確認する。

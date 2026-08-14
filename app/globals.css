@@ -1291,6 +1291,60 @@ input:focus {
   background: #fff5f4;
 }
 
+.history-recovery {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 4px;
+}
+
+.history-recovery label {
+  display: grid;
+  gap: 6px;
+}
+
+.history-recovery label span {
+  color: var(--muted, #667085);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.history-recovery input {
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  min-height: 40px;
+  padding: 0 10px;
+}
+
+.history-recovery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.history-reschedule-button,
+.history-delete-button {
+  align-items: center;
+  border-radius: 6px;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 800;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 10px;
+}
+
+.history-reschedule-button {
+  background: #eff8ff;
+  border: 1px solid #b2ddff;
+  color: #175cd3;
+}
+
+.history-delete-button {
+  background: #fff;
+  border: 1px solid #f2b8b5;
+  color: #b42318;
+}
+
 .mini-badge,
 .status-pill {
   border-radius: 999px;

@@ -134,6 +134,9 @@ function isMediaJobStale(updatedAt: string) {
   );
 }
 
+const pendingStoreKey = "instatic-talksx:pending-store";
+const pendingStoreMaxAgeMs = 15 * 60 * 1000;
+
 function getAuthRedirectUrl() {
   const basePath = process.env.NEXT_PUBLIC_APP_BASE_PATH ?? "";
   const normalizedPath = basePath
@@ -142,11 +145,75 @@ function getAuthRedirectUrl() {
   return new URL(normalizedPath, window.location.origin).toString();
 }
 
+function readOAuthCallbackError() {
+  if (typeof window === "undefined") return "";
+  const search = new URLSearchParams(window.location.search);
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  return (
+    search.get("error_description") ||
+    search.get("error") ||
+    hash.get("error_description") ||
+    hash.get("error") ||
+    ""
+  );
+}
+
+function clearAuthCallbackParams() {
+  if (typeof window === "undefined" || !window.history.replaceState) return;
+  const url = new URL(window.location.href);
+  for (const key of ["error", "error_description", "error_code"]) {
+    url.searchParams.delete(key);
+  }
+  window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+}
+
+function toDateTimeLocalValue(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function isFutureScheduleTime(value: string) {
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) && timestamp > Date.now() + 60 * 1000;
+}
+
+function isFreshAuthUser(user: User) {
+  const createdAt = Date.parse(user.created_at);
+  return (
+    Number.isFinite(createdAt) &&
+    Date.now() - createdAt < pendingStoreMaxAgeMs
+  );
+}
+
+function readPendingStoreId(user: User) {
+  if (typeof window === "undefined" || !isFreshAuthUser(user)) return null;
+  try {
+    return (
+      window.sessionStorage.getItem(pendingStoreKey) ||
+      window.localStorage.getItem(pendingStoreKey)
+    );
+  } catch {
+    return null;
+  }
+}
+
+function writePendingStoreId(storeId: string) {
+  window.sessionStorage.setItem(pendingStoreKey, storeId);
+  window.localStorage.removeItem(pendingStoreKey);
+}
+
+function clearPendingStoreId() {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.removeItem(pendingStoreKey);
+  window.localStorage.removeItem(pendingStoreKey);
+}
+
 type HistoryRecord = {
   id: string;
   title: string;
   body: string;
   time: string;
+  scheduledAt: string | null;
   channels: ChannelId[];
   status: RecordStatus;
   owner: string;
@@ -201,8 +268,6 @@ const emptySecretFlags: SecretFlags = {
   refreshToken: false,
   webhookSecret: false,
 };
-
-const pendingStoreKey = "instatic-talksx:pending-store";
 
 const channels: Array<{
   id: ChannelId;
@@ -347,14 +412,22 @@ export default function SocialConsole() {
   const [selectedStoreId, setSelectedStoreId] = useState("");
   const [storeSelectionRequired, setStoreSelectionRequired] = useState(false);
   const [savingStore, setSavingStore] = useState(false);
-  const [authLoading, setAuthLoading] = useState(false);
+  const [authLoading, setAuthLoading] = useState(Boolean(supabase));
+  const [rescheduleAt, setRescheduleAt] = useState("");
+  const [updatingHistoryId, setUpdatingHistoryId] = useState<string | null>(
+    null,
+  );
   const [dataLoading, setDataLoading] = useState(false);
   const [savingPost, setSavingPost] = useState(false);
   const [savingIntegration, setSavingIntegration] = useState(false);
   const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [authMessage, setAuthMessage] = useState("");
+  const [authMessage, setAuthMessage] = useState(() => {
+    const oauthError = readOAuthCallbackError();
+    if (oauthError) clearAuthCallbackParams();
+    return oauthError;
+  });
   const [notice, setNotice] = useState<{
     tone: "success" | "error" | "info";
     text: string;
@@ -573,10 +646,7 @@ export default function SocialConsole() {
         typeof currentUser.user_metadata?.social_store_id === "string"
           ? currentUser.user_metadata.social_store_id
           : null;
-      const pendingStoreId =
-        typeof window === "undefined"
-          ? null
-          : window.localStorage.getItem(pendingStoreKey);
+      const pendingStoreId = readPendingStoreId(currentUser);
       const candidateStoreId =
         activeWorkspace?.store_id ??
         profileResult.data?.store_id ??
@@ -601,7 +671,7 @@ export default function SocialConsole() {
 
       if (selectedStoreError) throw selectedStoreError;
       if (!selectedStore) {
-        window.localStorage.removeItem(pendingStoreKey);
+        clearPendingStoreId();
         setSelectedStoreId("");
         setStoreSelectionRequired(true);
         return;
@@ -663,7 +733,7 @@ export default function SocialConsole() {
       setCurrentStore(selectedStore as StoreRow);
       setSelectedStoreId(selectedStore.id);
       setStoreSelectionRequired(false);
-      window.localStorage.removeItem(pendingStoreKey);
+      clearPendingStoreId();
 
       const [postsResult, integrationsResult, mediaJobsResult] =
         await Promise.all([
@@ -705,6 +775,7 @@ export default function SocialConsole() {
           title: post.title,
           body: post.body,
           time: formatDateTime(post.scheduled_at),
+          scheduledAt: post.scheduled_at,
           channels: (post.social_post_channels ?? []).map(
             (item) => item.channel,
           ),
@@ -800,7 +871,9 @@ export default function SocialConsole() {
     setAuthMessage("");
 
     if (authMode === "signup") {
-      window.localStorage.setItem(pendingStoreKey, selectedStoreId);
+      writePendingStoreId(selectedStoreId);
+    } else {
+      clearPendingStoreId();
     }
 
     const result =
@@ -817,7 +890,7 @@ export default function SocialConsole() {
 
     if (result.error) {
       if (authMode === "signup") {
-        window.localStorage.removeItem(pendingStoreKey);
+        clearPendingStoreId();
       }
       setAuthMessage(result.error.message);
     } else if (authMode === "signup" && !result.data.session) {
@@ -838,7 +911,9 @@ export default function SocialConsole() {
     setAuthMessage("");
 
     if (authMode === "signup") {
-      window.localStorage.setItem(pendingStoreKey, selectedStoreId);
+      writePendingStoreId(selectedStoreId);
+    } else {
+      clearPendingStoreId();
     }
 
     const { data, error } = await supabase.auth.signInWithOAuth({
@@ -851,7 +926,7 @@ export default function SocialConsole() {
 
     if (error) {
       if (authMode === "signup") {
-        window.localStorage.removeItem(pendingStoreKey);
+        clearPendingStoreId();
       }
       setAuthMessage(error.message);
       setAuthLoading(false);
@@ -892,7 +967,7 @@ export default function SocialConsole() {
         .is("store_id", null);
       if (profileError) throw profileError;
 
-      window.localStorage.setItem(pendingStoreKey, selectedStore.id);
+      writePendingStoreId(selectedStore.id);
       await loadWorkspaceData(user);
     } catch (error) {
       setAuthMessage(
@@ -996,10 +1071,18 @@ export default function SocialConsole() {
       });
       return;
     }
+    if (!isFutureScheduleTime(scheduledAt)) {
+      setNotice({
+        tone: "error",
+        text: "公開予定は現在より後の日時を指定してください。",
+      });
+      return;
+    }
 
     setSavingPost(true);
     setNotice(null);
     let postId: string | null = null;
+    const uploadedStoragePaths: string[] = [];
     let mediaJobCount = 0;
     let cloudRunConnected = true;
 
@@ -1048,6 +1131,7 @@ export default function SocialConsole() {
             upsert: false,
           });
         if (uploadError) throw uploadError;
+        uploadedStoragePaths.push(storagePath);
 
         const { data: savedFile, error: fileError } = await supabase
           .from("social_post_files")
@@ -1111,10 +1195,7 @@ export default function SocialConsole() {
       setActiveView("calendar");
     } catch (error) {
       if (postId) {
-        await supabase
-          .from("social_posts")
-          .update({ status: "failed", updated_at: new Date().toISOString() })
-          .eq("id", postId);
+        await rollbackFailedSchedule(postId, uploadedStoragePaths);
       }
       setNotice({
         tone: "error",
@@ -1122,6 +1203,26 @@ export default function SocialConsole() {
       });
     } finally {
       setSavingPost(false);
+    }
+  }
+
+  async function rollbackFailedSchedule(
+    postId: string,
+    storagePaths: string[],
+  ) {
+    if (!supabase) return;
+    if (storagePaths.length) {
+      await supabase.storage.from("post-files").remove(storagePaths);
+    }
+    const { error } = await supabase
+      .from("social_posts")
+      .delete()
+      .eq("id", postId);
+    if (error) {
+      await supabase
+        .from("social_posts")
+        .update({ status: "failed", updated_at: new Date().toISOString() })
+        .eq("id", postId);
     }
   }
 
@@ -1161,16 +1262,152 @@ export default function SocialConsole() {
     await loadWorkspaceData(user);
   }
 
+  async function rescheduleDraftPost(postId: string) {
+    if (!supabase || !user) return;
+    const target = history.find((record) => record.id === postId);
+    if (
+      !target ||
+      (target.status !== "下書き" && target.status !== "失敗")
+    ) {
+      return;
+    }
+    if (!isFutureScheduleTime(rescheduleAt)) {
+      setNotice({
+        tone: "error",
+        text: "公開予定は現在より後の日時を指定してください。",
+      });
+      return;
+    }
+
+    setUpdatingHistoryId(postId);
+    setNotice(null);
+    const { data: updatedPost, error } = await supabase
+      .from("social_posts")
+      .update({
+        status: "scheduled",
+        scheduled_at: new Date(rescheduleAt).toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", postId)
+      .in("status", ["draft", "failed"])
+      .select("id")
+      .maybeSingle();
+
+    if (error || !updatedPost) {
+      setNotice({
+        tone: "error",
+        text: getErrorMessage(error, "再予約できませんでした。"),
+      });
+      setUpdatingHistoryId(null);
+      return;
+    }
+
+    setNotice({
+      tone: "success",
+      text: "下書きを予約投稿として保存しました。",
+    });
+    setUpdatingHistoryId(null);
+    await loadWorkspaceData(user);
+    setActiveView("calendar");
+  }
+
+  async function deleteSavedPost(postId: string) {
+    if (!supabase || !user) return;
+    const target = history.find((record) => record.id === postId);
+    if (
+      !target ||
+      (target.status !== "下書き" && target.status !== "失敗")
+    ) {
+      return;
+    }
+    if (
+      !window.confirm(
+        "この投稿と添付ファイルを削除します。この操作は取り消せません。",
+      )
+    ) {
+      return;
+    }
+
+    setUpdatingHistoryId(postId);
+    setNotice(null);
+    const storagePaths = target.files.map((file) => file.storagePath);
+    if (storagePaths.length) {
+      const { error: storageError } = await supabase.storage
+        .from("post-files")
+        .remove(storagePaths);
+      if (storageError) {
+        setNotice({
+          tone: "error",
+          text: getErrorMessage(
+            storageError,
+            "添付ファイルを削除できませんでした。",
+          ),
+        });
+        setUpdatingHistoryId(null);
+        return;
+      }
+    }
+
+    const { error } = await supabase
+      .from("social_posts")
+      .delete()
+      .eq("id", postId)
+      .in("status", ["draft", "failed"]);
+
+    if (error) {
+      setNotice({
+        tone: "error",
+        text: getErrorMessage(error, "投稿を削除できませんでした。"),
+      });
+      setUpdatingHistoryId(null);
+      return;
+    }
+
+    if (selectedHistoryId === postId) {
+      setSelectedHistoryId(null);
+      setRescheduleAt("");
+    }
+    setNotice({
+      tone: "success",
+      text: "投稿を削除しました。",
+    });
+    setUpdatingHistoryId(null);
+    await loadWorkspaceData(user);
+  }
+
   async function downloadFile(file: SavedFile) {
     if (!supabase) return;
     const { data, error } = await supabase.storage
       .from("post-files")
       .createSignedUrl(file.storagePath, 60, { download: file.name });
-    if (error) {
-      setNotice({ tone: "error", text: error.message });
+    if (error || !data?.signedUrl) {
+      setNotice({
+        tone: "error",
+        text: getErrorMessage(error, "ダウンロードURLを作成できませんでした。"),
+      });
       return;
     }
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    try {
+      const response = await fetch(data.signedUrl);
+      if (!response.ok) throw new Error("ファイルを取得できませんでした。");
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = file.name;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (downloadError) {
+      setNotice({
+        tone: "error",
+        text: getErrorMessage(
+          downloadError,
+          "ファイルをダウンロードできませんでした。",
+        ),
+      });
+    }
   }
 
   async function openVideoViewer(file: SavedFile) {
@@ -1296,7 +1533,17 @@ export default function SocialConsole() {
           },
         },
       );
-      if (secretError) throw secretError;
+      if (secretError) {
+        await supabase
+          .from("social_integrations")
+          .update({
+            status: "incomplete",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("workspace_id", workspaceId)
+          .eq("channel", id);
+        throw secretError;
+      }
 
       setIntegrations((current) => ({
         ...current,
@@ -1921,6 +2168,7 @@ export default function SocialConsole() {
                   <span>公開予定</span>
                   <input
                     type="datetime-local"
+                    min={toDateTimeLocalValue(new Date())}
                     value={scheduledAt}
                     onChange={(event) => setScheduledAt(event.target.value)}
                   />
@@ -2085,7 +2333,14 @@ export default function SocialConsole() {
                       }
                       key={record.id}
                       type="button"
-                      onClick={() => setSelectedHistoryId(record.id)}
+                      onClick={() => {
+                        setSelectedHistoryId(record.id);
+                        setRescheduleAt(
+                          toDateTimeLocalValue(
+                            new Date(Date.now() + 60 * 60 * 1000),
+                          ),
+                        );
+                      }}
                     >
                       <div className="history-card-main">
                         <strong>{record.title}</strong>
@@ -2147,6 +2402,54 @@ export default function SocialConsole() {
                       </span>
                     ))}
                   </div>
+                  {(selectedHistory.status === "下書き" ||
+                    selectedHistory.status === "失敗") && (
+                    <div className="history-recovery">
+                      <label>
+                        <span>公開予定</span>
+                        <input
+                          type="datetime-local"
+                          min={toDateTimeLocalValue(new Date())}
+                          value={rescheduleAt}
+                          onChange={(event) =>
+                            setRescheduleAt(event.target.value)
+                          }
+                        />
+                      </label>
+                      <div className="history-recovery-actions">
+                        <button
+                          className="history-reschedule-button"
+                          disabled={updatingHistoryId === selectedHistory.id}
+                          type="button"
+                          onClick={() =>
+                            void rescheduleDraftPost(selectedHistory.id)
+                          }
+                        >
+                          {updatingHistoryId === selectedHistory.id ? (
+                            <Loader2
+                              aria-hidden="true"
+                              className="spin"
+                              size={14}
+                            />
+                          ) : (
+                            <CalendarDays aria-hidden="true" size={14} />
+                          )}
+                          <span>再予約</span>
+                        </button>
+                        <button
+                          className="history-delete-button"
+                          disabled={updatingHistoryId === selectedHistory.id}
+                          type="button"
+                          onClick={() =>
+                            void deleteSavedPost(selectedHistory.id)
+                          }
+                        >
+                          <Trash2 aria-hidden="true" size={14} />
+                          <span>削除</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <div className="history-files">
                     <div className="section-title">
                       <Paperclip aria-hidden="true" size={16} />

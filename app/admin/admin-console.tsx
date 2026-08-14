@@ -194,9 +194,10 @@ export default function AdminConsole() {
   const [statusFilter, setStatusFilter] = useState<"all" | PostStatus>("all");
   const [storeFilter, setStoreFilter] = useState<"all" | string>("all");
   const [notice, setNotice] = useState<{
-    tone: "success" | "error";
+    tone: "success" | "error" | "info";
     text: string;
   } | null>(null);
+  const [dataTruncated, setDataTruncated] = useState(false);
   const [profiles, setProfiles] = useState<UserProfileRow[]>([]);
   const [adminUsers, setAdminUsers] = useState<AdminUserRow[]>([]);
   const [stores, setStores] = useState<StoreRow[]>([]);
@@ -532,14 +533,35 @@ export default function AdminConsole() {
 
       if (failedResult?.error) throw failedResult.error;
 
-      setProfiles((profilesResult.data ?? []) as UserProfileRow[]);
-      setAdminUsers((adminUsersResult.data ?? []) as AdminUserRow[]);
-      setStores((storesResult.data ?? []) as StoreRow[]);
-      setWorkspaces((workspacesResult.data ?? []) as WorkspaceRow[]);
-      setPosts((postsResult.data ?? []) as unknown as PostRow[]);
-      setFiles((filesResult.data ?? []) as FileRow[]);
-      setAuditLogs((auditResult.data ?? []) as unknown as AuditRow[]);
-      setIntegrations((integrationsResult.data ?? []) as IntegrationRow[]);
+      const loaded = {
+        profiles: (profilesResult.data ?? []) as UserProfileRow[],
+        adminUsers: (adminUsersResult.data ?? []) as AdminUserRow[],
+        stores: (storesResult.data ?? []) as StoreRow[],
+        workspaces: (workspacesResult.data ?? []) as WorkspaceRow[],
+        posts: (postsResult.data ?? []) as unknown as PostRow[],
+        files: (filesResult.data ?? []) as FileRow[],
+        auditLogs: (auditResult.data ?? []) as unknown as AuditRow[],
+        integrations: (integrationsResult.data ?? []) as IntegrationRow[],
+      };
+      const truncated = Object.values(loaded).some(
+        (rows) => rows.length >= 1000,
+      );
+
+      setProfiles(loaded.profiles);
+      setAdminUsers(loaded.adminUsers);
+      setStores(loaded.stores);
+      setWorkspaces(loaded.workspaces);
+      setPosts(loaded.posts);
+      setFiles(loaded.files);
+      setAuditLogs(loaded.auditLogs);
+      setIntegrations(loaded.integrations);
+      setDataTruncated(truncated);
+      if (truncated) {
+        setNotice({
+          tone: "info",
+          text: "表示は各一覧の新しい1000件までです。それより古いデータは画面に出ていません。",
+        });
+      }
     } catch (error) {
       setNotice({
         tone: "error",
@@ -577,12 +599,30 @@ export default function AdminConsole() {
 
   async function updatePostStatus(postId: string, status: PostStatus) {
     if (!supabase) return;
+    const currentPost = posts.find((post) => post.id === postId);
+    if (status === "scheduled" && !currentPost?.scheduled_at) {
+      setNotice({
+        tone: "error",
+        text: "公開予定日時がない投稿は予約済みにできません。",
+      });
+      return;
+    }
+
     setUpdatingPostId(postId);
     setNotice(null);
 
+    const nextScheduledAt =
+      status === "draft" || status === "failed"
+        ? null
+        : (currentPost?.scheduled_at ?? null);
+
     const { error } = await supabase
       .from("social_posts")
-      .update({ status, updated_at: new Date().toISOString() })
+      .update({
+        status,
+        scheduled_at: nextScheduledAt,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", postId);
 
     if (error) {
@@ -597,7 +637,12 @@ export default function AdminConsole() {
       setPosts((current) =>
         current.map((post) =>
           post.id === postId
-            ? { ...post, status, updated_at: new Date().toISOString() }
+            ? {
+                ...post,
+                status,
+                scheduled_at: nextScheduledAt,
+                updated_at: new Date().toISOString(),
+              }
             : post,
         ),
       );
@@ -626,7 +671,27 @@ export default function AdminConsole() {
       return;
     }
 
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    try {
+      const response = await fetch(data.signedUrl);
+      if (!response.ok) throw new Error("ファイルを取得できませんでした。");
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = file.file_name;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (downloadError) {
+      setNotice({
+        tone: "error",
+        text: getErrorMessage(
+          downloadError,
+          "ファイルをダウンロードできませんでした。",
+        ),
+      });
+    }
   }
 
   async function grantAdministratorAccess(profile: UserProfileRow) {
@@ -851,6 +916,8 @@ export default function AdminConsole() {
           <div className={`app-notice ${notice.tone}`} role="status">
             {notice.tone === "success" ? (
               <CheckCircle2 aria-hidden="true" size={17} />
+            ) : notice.tone === "info" ? (
+              <Activity aria-hidden="true" size={17} />
             ) : (
               <ShieldAlert aria-hidden="true" size={17} />
             )}
@@ -984,7 +1051,10 @@ export default function AdminConsole() {
             <div className="admin-section-heading">
               <div>
                 <h3>{selectedStoreName}の投稿</h3>
-                <p>{filteredPosts.length}件を表示</p>
+                <p>
+                  {filteredPosts.length}件を表示
+                  {dataTruncated ? "（新しい1000件まで）" : ""}
+                </p>
               </div>
             </div>
             <div className="admin-table-scroll">
