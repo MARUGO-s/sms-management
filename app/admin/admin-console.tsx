@@ -8,6 +8,8 @@ import {
   Building2,
   CalendarDays,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Download,
   ExternalLink,
   FileText,
@@ -117,6 +119,9 @@ type IntegrationRow = {
   status: string;
 };
 
+const ADMIN_PAGE_SIZE = 50;
+const ADMIN_FETCH_CHUNK = 1000;
+
 const adminViews = [
   { id: "posts" as const, label: "投稿", icon: FileText },
   { id: "schedule" as const, label: "予約予定", icon: CalendarDays },
@@ -167,6 +172,40 @@ function formatFileSize(value: number) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+async function fetchAllRows<T>(
+  query: () => {
+    range: (
+      from: number,
+      to: number,
+    ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
+  },
+) {
+  const rows: T[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await query().range(
+      from,
+      from + ADMIN_FETCH_CHUNK - 1,
+    );
+    if (error) throw error;
+    const chunk = data ?? [];
+    rows.push(...chunk);
+    if (chunk.length < ADMIN_FETCH_CHUNK) break;
+    from += ADMIN_FETCH_CHUNK;
+  }
+  return rows;
+}
+
+function pageSlice<T>(rows: T[], page: number) {
+  const safePage = Math.min(Math.max(page, 1), pageCountFor(rows.length));
+  const start = (safePage - 1) * ADMIN_PAGE_SIZE;
+  return rows.slice(start, start + ADMIN_PAGE_SIZE);
+}
+
+function pageCountFor(total: number) {
+  return Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+}
+
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error) return error.message;
   if (
@@ -178,6 +217,45 @@ function getErrorMessage(error: unknown, fallback: string) {
     return error.message;
   }
   return fallback;
+}
+
+function AdminPager({
+  label,
+  page,
+  total,
+  onPageChange,
+}: {
+  label: string;
+  page: number;
+  total: number;
+  onPageChange: (page: number) => void;
+}) {
+  if (total <= ADMIN_PAGE_SIZE) return null;
+  const pageCount = pageCountFor(total);
+  const current = Math.min(Math.max(page, 1), pageCount);
+  return (
+    <nav className="admin-pager" aria-label={`${label}のページ送り`}>
+      <button
+        type="button"
+        disabled={current <= 1}
+        onClick={() => onPageChange(current - 1)}
+      >
+        <ChevronLeft aria-hidden="true" size={16} />
+        <span>前へ</span>
+      </button>
+      <span>
+        {current} / {pageCount} ページ（全{total}件）
+      </span>
+      <button
+        type="button"
+        disabled={current >= pageCount}
+        onClick={() => onPageChange(current + 1)}
+      >
+        <span>次へ</span>
+        <ChevronRight aria-hidden="true" size={16} />
+      </button>
+    </nav>
+  );
 }
 
 export default function AdminConsole() {
@@ -193,11 +271,11 @@ export default function AdminConsole() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | PostStatus>("all");
   const [storeFilter, setStoreFilter] = useState<"all" | string>("all");
+  const [listPage, setListPage] = useState(1);
   const [notice, setNotice] = useState<{
     tone: "success" | "error" | "info";
     text: string;
   } | null>(null);
-  const [dataTruncated, setDataTruncated] = useState(false);
   const [profiles, setProfiles] = useState<UserProfileRow[]>([]);
   const [adminUsers, setAdminUsers] = useState<AdminUserRow[]>([]);
   const [stores, setStores] = useState<StoreRow[]>([]);
@@ -413,6 +491,30 @@ export default function AdminConsole() {
       ),
     [normalizedQuery, profiles, storeById, storeFilter],
   );
+  const pagedPosts = useMemo(
+    () => pageSlice(filteredPosts, listPage),
+    [filteredPosts, listPage],
+  );
+  const pagedScheduledPosts = useMemo(
+    () => pageSlice(filteredScheduledPosts, listPage),
+    [filteredScheduledPosts, listPage],
+  );
+  const pagedFiles = useMemo(
+    () => pageSlice(filteredFiles, listPage),
+    [filteredFiles, listPage],
+  );
+  const pagedAuditLogs = useMemo(
+    () => pageSlice(filteredAuditLogs, listPage),
+    [filteredAuditLogs, listPage],
+  );
+  const pagedProfiles = useMemo(
+    () => pageSlice(filteredProfiles, listPage),
+    [filteredProfiles, listPage],
+  );
+
+  function resetListPage() {
+    setListPage(1);
+  }
   const storeSummaries = useMemo(
     () =>
       stores.map((store) => {
@@ -464,104 +566,79 @@ export default function AdminConsole() {
 
     try {
       const [
-        profilesResult,
-        adminUsersResult,
-        storesResult,
-        workspacesResult,
-        postsResult,
-        filesResult,
-        auditResult,
-        integrationsResult,
+        profiles,
+        adminUsers,
+        stores,
+        workspaces,
+        posts,
+        files,
+        auditLogs,
+        integrations,
       ] = await Promise.all([
-        supabase
-          .from("social_user_profiles")
-          .select("user_id, email, store_id, created_at, last_sign_in_at")
-          .order("created_at", { ascending: false })
-          .limit(1000),
-        supabase
-          .from("social_admin_users")
-          .select("user_id, granted_at")
-          .order("granted_at", { ascending: true })
-          .limit(1000),
-        supabase
-          .from("social_stores")
-          .select("id, name, area, sort_order, is_active")
-          .order("sort_order", { ascending: true })
-          .limit(1000),
-        supabase
-          .from("social_workspaces")
-          .select("id, name, store_id, created_by, created_at")
-          .order("created_at", { ascending: false })
-          .limit(1000),
-        supabase
-          .from("social_posts")
-          .select(
-            "id, workspace_id, title, body, scheduled_at, status, created_by, created_at, updated_at, social_post_channels(channel)",
-          )
-          .order("created_at", { ascending: false })
-          .limit(1000),
-        supabase
-          .from("social_post_files")
-          .select(
-            "id, workspace_id, post_id, storage_path, file_name, content_type, file_size, created_by, created_at",
-          )
-          .order("created_at", { ascending: false })
-          .limit(1000),
-        supabase
-          .from("social_audit_logs")
-          .select(
-            "id, workspace_id, actor_user_id, action, entity_type, entity_id, label, metadata, created_at",
-          )
-          .order("created_at", { ascending: false })
-          .limit(1000),
-        supabase
-          .from("social_integrations")
-          .select("id, workspace_id, channel, status")
-          .limit(1000),
+        fetchAllRows<UserProfileRow>(() =>
+          supabase
+            .from("social_user_profiles")
+            .select("user_id, email, store_id, created_at, last_sign_in_at")
+            .order("created_at", { ascending: false }),
+        ),
+        fetchAllRows<AdminUserRow>(() =>
+          supabase
+            .from("social_admin_users")
+            .select("user_id, granted_at")
+            .order("granted_at", { ascending: true }),
+        ),
+        fetchAllRows<StoreRow>(() =>
+          supabase
+            .from("social_stores")
+            .select("id, name, area, sort_order, is_active")
+            .order("sort_order", { ascending: true }),
+        ),
+        fetchAllRows<WorkspaceRow>(() =>
+          supabase
+            .from("social_workspaces")
+            .select("id, name, store_id, created_by, created_at")
+            .order("created_at", { ascending: false }),
+        ),
+        fetchAllRows<PostRow>(() =>
+          supabase
+            .from("social_posts")
+            .select(
+              "id, workspace_id, title, body, scheduled_at, status, created_by, created_at, updated_at, social_post_channels(channel)",
+            )
+            .order("created_at", { ascending: false }),
+        ),
+        fetchAllRows<FileRow>(() =>
+          supabase
+            .from("social_post_files")
+            .select(
+              "id, workspace_id, post_id, storage_path, file_name, content_type, file_size, created_by, created_at",
+            )
+            .order("created_at", { ascending: false }),
+        ),
+        fetchAllRows<AuditRow>(() =>
+          supabase
+            .from("social_audit_logs")
+            .select(
+              "id, workspace_id, actor_user_id, action, entity_type, entity_id, label, metadata, created_at",
+            )
+            .order("created_at", { ascending: false }),
+        ),
+        fetchAllRows<IntegrationRow>(() =>
+          supabase
+            .from("social_integrations")
+            .select("id, workspace_id, channel, status"),
+        ),
       ]);
 
-      const failedResult = [
-        profilesResult,
-        adminUsersResult,
-        storesResult,
-        workspacesResult,
-        postsResult,
-        filesResult,
-        auditResult,
-        integrationsResult,
-      ].find((result) => result.error);
-
-      if (failedResult?.error) throw failedResult.error;
-
-      const loaded = {
-        profiles: (profilesResult.data ?? []) as UserProfileRow[],
-        adminUsers: (adminUsersResult.data ?? []) as AdminUserRow[],
-        stores: (storesResult.data ?? []) as StoreRow[],
-        workspaces: (workspacesResult.data ?? []) as WorkspaceRow[],
-        posts: (postsResult.data ?? []) as unknown as PostRow[],
-        files: (filesResult.data ?? []) as FileRow[],
-        auditLogs: (auditResult.data ?? []) as unknown as AuditRow[],
-        integrations: (integrationsResult.data ?? []) as IntegrationRow[],
-      };
-      const truncated = Object.values(loaded).some(
-        (rows) => rows.length >= 1000,
-      );
-
-      setProfiles(loaded.profiles);
-      setAdminUsers(loaded.adminUsers);
-      setStores(loaded.stores);
-      setWorkspaces(loaded.workspaces);
-      setPosts(loaded.posts);
-      setFiles(loaded.files);
-      setAuditLogs(loaded.auditLogs);
-      setIntegrations(loaded.integrations);
-      setDataTruncated(truncated);
-      if (truncated) {
-        setNotice({
-          tone: "info",
-          text: "表示は各一覧の新しい1000件までです。それより古いデータは画面に出ていません。",
-        });
-      }
+      setProfiles(profiles);
+      setAdminUsers(adminUsers);
+      setStores(stores);
+      setWorkspaces(workspaces);
+      setPosts(posts as unknown as PostRow[]);
+      setFiles(files);
+      setAuditLogs(auditLogs);
+      setIntegrations(integrations);
+      setListPage(1);
     } catch (error) {
       setNotice({
         tone: "error",
@@ -834,7 +911,10 @@ export default function AdminConsole() {
                     : "admin-nav-button"
                 }
                 type="button"
-                onClick={() => setActiveView(view.id)}
+                onClick={() => {
+                  setActiveView(view.id);
+                  resetListPage();
+                }}
               >
                 <Icon aria-hidden="true" size={18} />
                 <span>{view.label}</span>
@@ -936,7 +1016,10 @@ export default function AdminConsole() {
               <input
                 placeholder="利用者、投稿、ファイルを検索"
                 value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value);
+                  resetListPage();
+                }}
               />
             </label>
             <div className="admin-toolbar-filters">
@@ -944,7 +1027,10 @@ export default function AdminConsole() {
                 <span>店舗</span>
                 <select
                   value={storeFilter}
-                  onChange={(event) => setStoreFilter(event.target.value)}
+                  onChange={(event) => {
+                    setStoreFilter(event.target.value);
+                    resetListPage();
+                  }}
                 >
                   <option value="all">全店舗</option>
                   {stores.map((store) => (
@@ -959,11 +1045,12 @@ export default function AdminConsole() {
                   <span>ステータス</span>
                   <select
                     value={statusFilter}
-                    onChange={(event) =>
+                    onChange={(event) => {
                       setStatusFilter(
                         event.target.value as "all" | PostStatus,
-                      )
-                    }
+                      );
+                      resetListPage();
+                    }}
                   >
                     <option value="all">すべて</option>
                     {statusOptions.map((option) => (
@@ -995,7 +1082,10 @@ export default function AdminConsole() {
                     : "admin-store-all"
                 }
                 type="button"
-                onClick={() => setStoreFilter("all")}
+                onClick={() => {
+                  setStoreFilter("all");
+                  resetListPage();
+                }}
               >
                 全店舗
               </button>
@@ -1025,7 +1115,10 @@ export default function AdminConsole() {
                         <button
                           className="admin-store-link"
                           type="button"
-                          onClick={() => setStoreFilter(summary.store.id)}
+                          onClick={() => {
+                            setStoreFilter(summary.store.id);
+                            resetListPage();
+                          }}
                         >
                           <Building2 aria-hidden="true" size={15} />
                           <span>
@@ -1052,8 +1145,8 @@ export default function AdminConsole() {
               <div>
                 <h3>{selectedStoreName}の投稿</h3>
                 <p>
-                  {filteredPosts.length}件を表示
-                  {dataTruncated ? "（新しい1000件まで）" : ""}
+                  {filteredPosts.length}件中
+                  {pagedPosts.length}件を表示
                 </p>
               </div>
             </div>
@@ -1070,7 +1163,7 @@ export default function AdminConsole() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredPosts.map((post) => (
+                  {pagedPosts.map((post) => (
                     <tr key={post.id}>
                       <td className="admin-primary-cell">
                         <strong>{post.title || "無題の投稿"}</strong>
@@ -1117,6 +1210,12 @@ export default function AdminConsole() {
                 <span>条件に一致する投稿はありません。</span>
               </div>
             )}
+            <AdminPager
+              label="投稿"
+              page={listPage}
+              total={filteredPosts.length}
+              onPageChange={setListPage}
+            />
           </section>
         )}
 
@@ -1125,7 +1224,10 @@ export default function AdminConsole() {
             <div className="admin-section-heading">
               <div>
                 <h3>{selectedStoreName}の予約予定</h3>
-                <p>{filteredScheduledPosts.length}件を日時順に表示</p>
+                <p>
+                  {filteredScheduledPosts.length}件中
+                  {pagedScheduledPosts.length}件を日時順に表示
+                </p>
               </div>
               <span className="admin-count-label">
                 予約中 {filteredScheduledPosts.length}件
@@ -1144,7 +1246,7 @@ export default function AdminConsole() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredScheduledPosts.map((post) => (
+                  {pagedScheduledPosts.map((post) => (
                     <tr key={post.id}>
                       <td className="admin-schedule-time">
                         <CalendarDays aria-hidden="true" size={15} />
@@ -1177,6 +1279,12 @@ export default function AdminConsole() {
                 <span>条件に一致する予約投稿はありません。</span>
               </div>
             )}
+            <AdminPager
+              label="予約予定"
+              page={listPage}
+              total={filteredScheduledPosts.length}
+              onPageChange={setListPage}
+            />
           </section>
         )}
 
@@ -1185,7 +1293,10 @@ export default function AdminConsole() {
             <div className="admin-section-heading">
               <div>
                 <h3>{selectedStoreName}のファイル</h3>
-                <p>{filteredFiles.length}件を表示</p>
+                <p>
+                  {filteredFiles.length}件中
+                  {pagedFiles.length}件を表示
+                </p>
               </div>
             </div>
             <div className="admin-table-scroll">
@@ -1203,7 +1314,7 @@ export default function AdminConsole() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredFiles.map((file) => (
+                  {pagedFiles.map((file) => (
                     <tr key={file.id}>
                       <td className="admin-primary-cell">
                         <strong>{file.file_name}</strong>
@@ -1238,6 +1349,12 @@ export default function AdminConsole() {
                 <span>条件に一致するファイルはありません。</span>
               </div>
             )}
+            <AdminPager
+              label="ファイル"
+              page={listPage}
+              total={filteredFiles.length}
+              onPageChange={setListPage}
+            />
           </section>
         )}
 
@@ -1246,7 +1363,10 @@ export default function AdminConsole() {
             <div className="admin-section-heading">
               <div>
                 <h3>{selectedStoreName}の操作履歴</h3>
-                <p>{filteredAuditLogs.length}件を表示</p>
+                <p>
+                  {filteredAuditLogs.length}件中
+                  {pagedAuditLogs.length}件を表示
+                </p>
               </div>
             </div>
             <div className="admin-table-scroll">
@@ -1261,7 +1381,7 @@ export default function AdminConsole() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAuditLogs.map((log) => (
+                  {pagedAuditLogs.map((log) => (
                     <tr key={log.id}>
                       <td>{formatDateTime(log.created_at)}</td>
                       <td>
@@ -1296,6 +1416,12 @@ export default function AdminConsole() {
                 <span>条件に一致する操作履歴はありません。</span>
               </div>
             )}
+            <AdminPager
+              label="操作履歴"
+              page={listPage}
+              total={filteredAuditLogs.length}
+              onPageChange={setListPage}
+            />
           </section>
         )}
 
@@ -1379,7 +1505,10 @@ export default function AdminConsole() {
             <div className="admin-section-heading">
               <div>
                 <h3>{selectedStoreName}の利用者</h3>
-                <p>{filteredProfiles.length}名を表示</p>
+                <p>
+                  {filteredProfiles.length}名中
+                  {pagedProfiles.length}名を表示
+                </p>
               </div>
               <span className="admin-count-label">
                 管理者 {adminUsers.length}名
@@ -1402,7 +1531,7 @@ export default function AdminConsole() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredProfiles.map((profile) => {
+                  {pagedProfiles.map((profile) => {
                     const isAdministrator = adminUsers.some(
                       (administrator) =>
                         administrator.user_id === profile.user_id,
@@ -1499,6 +1628,12 @@ export default function AdminConsole() {
                 <span>条件に一致する利用者はいません。</span>
               </div>
             )}
+            <AdminPager
+              label="利用者"
+              page={listPage}
+              total={filteredProfiles.length}
+              onPageChange={setListPage}
+            />
           </section>
         )}
       </section>

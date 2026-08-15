@@ -1,15 +1,15 @@
-# Graph Report - .  (2026-08-14)
+# Graph Report - .  (2026-08-16)
 
 ## Corpus Check
 - cluster-only mode — file stats not available
 
 ## Summary
-- 374 nodes · 406 edges · 37 communities (25 shown, 12 thin omitted)
+- 378 nodes · 414 edges · 37 communities (25 shown, 12 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 1 edges (avg confidence: 0.5)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `598ce7ac`
+- Built from commit: `6621826b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -58,9 +58,9 @@
 5. `SocialConsole()` - 7 edges
 6. `createTimelinePlan()` - 6 edges
 7. `MediaEditor()` - 6 edges
-8. `safeRelativeReturnPath()` - 4 edges
-9. `getDb()` - 4 edges
-10. `lib` - 4 edges
+8. `AdminConsole()` - 6 edges
+9. `safeRelativeReturnPath()` - 4 edges
+10. `getDb()` - 4 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `GET()` --calls--> `getDb()`  [EXTRACTED]
@@ -82,12 +82,12 @@ Cohesion: 0.06
 Nodes (33): @cloudflare/vite-plugin, drizzle-kit, eslint, eslint-config-next, devDependencies, @cloudflare/vite-plugin, drizzle-kit, eslint (+25 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.07
-Nodes (28): dom, dom.iterable, esnext, **/*.mts, .next/dev/types/**/*.ts, next-env.d.ts, .next/types/**/*.ts, node_modules (+20 more)
+Cohesion: 0.08
+Nodes (26): AccessState, actionLabels, AdminConsole(), AdminPager(), AdminUserRow, AdminView, adminViews, AuditRow (+18 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.09
-Nodes (22): AccessState, actionLabels, AdminConsole(), AdminUserRow, AdminView, adminViews, AuditRow, entityLabels (+14 more)
+Cohesion: 0.07
+Nodes (28): dom, dom.iterable, esnext, **/*.mts, .next/dev/types/**/*.ts, next-env.d.ts, .next/types/**/*.ts, node_modules (+20 more)
 
 ### Community 4 - "Community 4"
 Cohesion: 0.15
@@ -174,7 +174,7 @@ Nodes (3): imports, @supabase/functions-js, @supabase/server
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `devDependencies` connect `Community 1` to `Community 6`?**
-  _High betweenness centrality (0.025) - this node is a cross-community bridge._
+  _High betweenness centrality (0.024) - this node is a cross-community bridge._
 - **Why does `dependencies` connect `Community 7` to `Community 6`?**
   _High betweenness centrality (0.014) - this node is a cross-community bridge._
 - **What connects `ChatGPTUser`, `eslintConfig`, `config` to the rest of the system?**
@@ -184,6 +184,6 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `Community 1` be split into smaller, more focused modules?**
   _Cohesion score 0.06060606060606061 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
-  _Cohesion score 0.06896551724137931 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.08172043010752689 - nodes in this community are weakly interconnected._
 - **Should `Community 3` be split into smaller, more focused modules?**
-  _Cohesion score 0.08547008547008547 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06896551724137931 - nodes in this community are weakly interconnected._

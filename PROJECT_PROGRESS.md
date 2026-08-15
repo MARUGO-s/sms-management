@@ -1264,3 +1264,14 @@ supabase functions deploy media-jobs --use-api
 - 未完了事項: なし。
 - 次の作業: 利用者が指定する次の編集。
 
+### 2026-08-16 - 管理者画面にページ送りを追加
+
+- 依頼: 1000件上限の警告だけでなく、一覧のページ送りまで実装する。
+- 実施内容: 管理者の投稿・予約予定・ファイル・操作履歴・利用者を、Supabaseから1000件ずつ最後まで取得し、画面は50件ずつ「前へ／次へ」で送れるようにした。店舗・検索・ステータス変更で1ページ目に戻る。
+- 変更ファイル: `app/admin/admin-console.tsx`、`app/globals.css`、`tests/rendered-html.test.mjs`、`PROJECT_PROGRESS.md`。
+- DB・設定変更: なし。
+- 検証: ESLint error 0、`node --test tests/rendered-html.test.mjs tests/knowledge-system.test.mjs` 7件成功。
+- 未完了事項: なし。
+- 次の作業: 利用者が指定する次の編集。
+
+

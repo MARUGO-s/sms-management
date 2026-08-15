@@ -93,7 +93,10 @@ test("store affiliation, administrator schedules, and knowledge maps remain wire
   assert.match(consoleSource, /公開予定は現在より後の日時を指定してください/);
   assert.match(consoleSource, /isFreshAuthUser/);
   assert.match(adminSource, /公開予定日時がない投稿は予約済みにできません/);
-  assert.match(adminSource, /新しい1000件まで/);
+  assert.match(adminSource, /fetchAllRows/);
+  assert.match(adminSource, /AdminPager/);
+  assert.match(adminSource, /前へ/);
+  assert.match(adminSource, /次へ/);
   assert.match(adminSource, /予約予定/);
   assert.match(adminSource, /店舗別運用状況/);
   assert.match(adminSource, /全店舗/);
