@@ -1674,6 +1674,12 @@ export default function SocialConsole() {
               <p>業務データはアカウントごとに保護されます。</p>
             </div>
           </div>
+          {authMode === "signin" && (
+            <p className="auth-security-notice">
+              セキュリティ保護のため、以前のパスワードを一度クリアしています。
+              「パスワードを再設定」から、再度パスワードを設定してください。
+            </p>
+          )}
           {authMode === "signup" && (
             <label className="auth-store-field">
               <span>所属店舗</span>

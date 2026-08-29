@@ -1274,4 +1274,14 @@ supabase functions deploy media-jobs --use-api
 - 未完了事項: なし。
 - 次の作業: 利用者が指定する次の編集。
 
+### 2026-08-29 - ログイン画面のパスワード再設定注釈
+
+- 依頼: セキュリティ保護のためパスワードをクリアした旨と、再設定を促す注釈をトップのログイン画面へ表示する。
+- 実施内容: ログインモード時のみ、パスワード再設定リンクの利用を促す注釈を追加。登録画面には表示しない。
+- 変更ファイル: `app/social-console.tsx`、`app/globals.css`。
+- DB・設定変更: なし。
+- 検証: `npm test` 16件成功、`npm run build:github-pages` 成功、`git diff --check` 成功。
+- デプロイ: `main`へpushしてGitHub ActionsによるGitHub Pages公開を開始する。
+- 未完了事項: 公開URLでのブラウザ表示確認。
+- 次の作業: GitHub Actions完了後にログイン画面を再読み込みして注釈を確認する。
 

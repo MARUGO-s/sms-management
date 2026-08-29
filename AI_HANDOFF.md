@@ -190,6 +190,10 @@ Supabase Dashboard > Authentication > URL Configuration must include `https://ma
 
 ## Graphify system map
 
+## 2026-08-29 login notice
+
+The login screen displays a security notice explaining that the previous password was cleared and directing users to `パスワードを再設定`. It is shown only in sign-in mode. The change is in `app/social-console.tsx` and `app/globals.css`; no database or Auth configuration changed. `npm test` and `npm run build:github-pages` passed. Verify the notice after the GitHub Pages deployment completes.
+
 The administrator console includes a `システムマップ` view with two generated surfaces: `public/system-map/graph.html` for the Graphify code graph and `public/system-map/environment.html` for the runtime plus AI/Graphify/Obsidian knowledge loop. The current graph statistics are generated into `public/system-map/graph-stats.json`; do not hardcode counts in the UI.
 
 After intentional code structure changes, run `npm run knowledge:update`. It refreshes Graphify, the admin map, the environment diagram, the Obsidian Graphify export, AI entry notes, and consistency checks. Use `npm run knowledge:check` before closure. `graphify-out/` is deliberately ignored by Git and must not be added to the Dropbox source mirror. Keep this code-only boundary; do not add environment files, runtime secrets, user uploads, post content, or database exports to Graphify input.
