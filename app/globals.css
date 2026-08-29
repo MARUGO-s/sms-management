@@ -1858,16 +1858,6 @@ input:focus {
   margin-top: 4px;
 }
 
-.auth-security-notice {
-  background: #fff7ed;
-  border-left: 3px solid #f97316;
-  color: #9a3412;
-  font-size: 13px;
-  line-height: 1.6;
-  margin: -6px 0 0;
-  padding: 10px 12px;
-}
-
 .auth-form {
   display: grid;
   gap: 14px;
